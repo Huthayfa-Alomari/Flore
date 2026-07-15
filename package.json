@@ -37,7 +37,7 @@
     "@react-three/fiber": "^8.17.0",
     "@sentry/nextjs": "^10.64.0",
     "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.106.1",
+    "@supabase/supabase-js": "^2.110.5",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "class-variance-authority": "^0.7.0",
