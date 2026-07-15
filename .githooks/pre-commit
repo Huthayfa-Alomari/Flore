@@ -1,0 +1,26 @@
+#!/bin/sh
+# Pre-commit hook to block secrets and env files
+
+# Block .env*.local files
+if git diff --cached --name-only | grep -qE '^\.env.*\.local$'; then
+    echo "❌ ERROR: Committing .env*.local files is forbidden!"
+    echo "   Use .env.example for templates."
+    exit 1
+fi
+
+# Block JWT tokens (eyJhbGciOi)
+if git diff --cached | grep -qE 'eyJhb[g]ciOi'; then
+    echo "❌ ERROR: Potential JWT token detected in staged changes!"
+    echo "   Remove the token and use environment variables."
+    exit 1
+fi
+
+# Block sk- API keys (OpenAI/Stripe style)
+if git diff --cached | grep -qE 'sk-[a-zA-Z0-9]{20,}'; then
+    echo "❌ ERROR: Potential API key (sk-...) detected in staged changes!"
+    echo "   Remove the key and use environment variables."
+    exit 1
+fi
+
+echo "✅ Pre-commit checks passed"
+exit 0

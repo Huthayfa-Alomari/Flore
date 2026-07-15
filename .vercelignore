@@ -1,0 +1,12 @@
+# Don't deploy these to Vercel
+README.md
+.env.example
+Dockerfile
+docker-compose.yml
+.github
+__tests__
+*.test.ts
+*.test.tsx
+vitest.config.ts
+.eslintrc
+.prettierrc
