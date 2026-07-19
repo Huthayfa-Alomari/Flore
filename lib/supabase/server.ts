@@ -9,11 +9,12 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll()
+        async getAll() {
+          const store = await cookieStore
+          return store.getAll()
         },
         // تعيين نوع صريح مصفوفي (Explicit Array Type) لمنع خطأ Implicit Any
-        setAll(
+        async setAll(
           cookiesToSet: Array<{
             name: string
             value: string
@@ -21,8 +22,9 @@ export function createClient() {
           }>
         ) {
           try {
+            const store = await cookieStore
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options)
+              store.set(name, value, options)
             })
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {

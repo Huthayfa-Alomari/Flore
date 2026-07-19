@@ -45,19 +45,25 @@ ALTER TABLE flower_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wrap_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vase_options ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Flower types are viewable by everyone" ON flower_types
+DROP POLICY IF EXISTS "Flower types are viewable by everyone" ON flower_types;
+CREATE POLICY "Flower types are viewable by everyone" ON flower_types
   FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Flower types are writable by admin only" ON flower_types
+DROP POLICY IF EXISTS "Flower types are writable by admin only" ON flower_types;
+CREATE POLICY "Flower types are writable by admin only" ON flower_types
   FOR ALL USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
-CREATE POLICY IF NOT EXISTS "Wrap options are viewable by everyone" ON wrap_options
+DROP POLICY IF EXISTS "Wrap options are viewable by everyone" ON wrap_options;
+CREATE POLICY "Wrap options are viewable by everyone" ON wrap_options
   FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Wrap options are writable by admin only" ON wrap_options
+DROP POLICY IF EXISTS "Wrap options are writable by admin only" ON wrap_options;
+CREATE POLICY "Wrap options are writable by admin only" ON wrap_options
   FOR ALL USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
-CREATE POLICY IF NOT EXISTS "Vase options are viewable by everyone" ON vase_options
+DROP POLICY IF EXISTS "Vase options are viewable by everyone" ON vase_options;
+CREATE POLICY "Vase options are viewable by everyone" ON vase_options
   FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Vase options are writable by admin only" ON vase_options
+DROP POLICY IF EXISTS "Vase options are writable by admin only" ON vase_options;
+CREATE POLICY "Vase options are writable by admin only" ON vase_options
   FOR ALL USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
 -- ========================================================
