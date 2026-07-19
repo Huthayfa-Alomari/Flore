@@ -40,11 +40,11 @@ export function Footer() {
           <div className="space-y-3 text-sm">
             <a href="tel:+962790000000" className="flex items-center gap-2 text-white/70 hover:text-white transition-colors justify-start">
               <Phone className="h-4 w-4 shrink-0" />
-              <span>0790000000</span>
+              <span>0788570246</span>
             </a>
             <a href="https://instagram.com/flore_jo" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-white/70 hover:text-white transition-colors justify-start">
               <Instagram className="h-4 w-4 shrink-0" />
-              <span dir="ltr">@flore_jo</span>
+              <span dir="ltr">@flore_jor</span>
             </a>
           </div>
         </div>
