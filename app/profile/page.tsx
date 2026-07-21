@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Image from 'next/image'
 import type { User } from '@supabase/supabase-js'
-import { ShoppingBag, Heart, Settings, LogOut } from 'lucide-react'
+import { ShoppingBag, Heart, Settings, LogOut, Store } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCart } from '@/hooks/useCart'
 import { Button } from '@/components/ui/Button'
@@ -15,6 +16,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'settings'>('orders')
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -26,6 +28,13 @@ export default function ProfilePage() {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
     if (data) setProfile(data as Profile)
     setLoading(false)
+  }, [supabase])
+
+  // يتحقق من دور المستخدم لعرض رابط بوابة التجار (B2B) فقط لأصحاب المحلات/الموردين/الأدمن.
+  // هذا مجرد إخفاء بصري مريح؛ الحماية الفعلية موجودة أصلاً داخل app/(b2b)/wholesale/page.tsx نفسها
+  const fetchUserRole = useCallback(async (userId: string) => {
+    const { data } = await supabase.from('user_roles').select('role').eq('user_id', userId).single()
+    setUserRole(data?.role || null)
   }, [supabase])
 
   const fetchOrders = useCallback(async (userId: string) => {
@@ -47,9 +56,10 @@ export default function ProfilePage() {
       setUser(user)
       fetchProfile(user.id)
       fetchOrders(user.id)
+      fetchUserRole(user.id)
     }
     getUser()
-  }, [supabase, router, fetchProfile, fetchOrders])
+  }, [supabase, router, fetchProfile, fetchOrders, fetchUserRole])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -177,6 +187,17 @@ export default function ProfilePage() {
                   className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none"
                 />
               </div>
+
+              {/* بوابة التجار (B2B) — تظهر فقط لأصحاب الأدوار المصرح لها */}
+              {userRole && ['shop_owner', 'vendor', 'admin'].includes(userRole) && (
+                <Link href="/wholesale">
+                  <Button variant="outline" className="w-full gap-2 text-flore-primary border-flore-primary/30 hover:bg-flore-subtle">
+                    <Store className="h-4 w-4" />
+                    بوابة التجار (أسعار الجملة)
+                  </Button>
+                </Link>
+              )}
+
               <Button onClick={handleLogout} variant="outline" className="w-full gap-2 text-red-500 border-red-200 hover:bg-red-50">
                 <LogOut className="h-4 w-4" />
                 تسجيل الخروج
@@ -188,4 +209,3 @@ export default function ProfilePage() {
     </div>
   )
 }
-
