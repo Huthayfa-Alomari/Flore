@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // مسارات الـ Webhooks تُستدعى من خوادم خارجية (Stripe، CliQ) وليس من متصفح المستخدم،
@@ -14,7 +14,6 @@ function isCsrfSafe(request: NextRequest): boolean {
   const origin = request.headers.get('origin')
   const host = request.headers.get('host')
 
-  // لا يوجد Origin على الإطلاق (بعض عملاء API/سكربتات لا ترسله) — نرفض بحذر لمسارات الحالة الحساسة
   if (!origin || !host) return false
 
   try {
@@ -31,8 +30,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
   }
 
-  // Guard: إذا لم تكن env vars موجودة (مثلاً أثناء next build بدون .env.local)
-  // نمرر الطلب مباشرة بدون تحقق من Supabase لتجنب إسقاط prerendering
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -46,18 +43,19 @@ export async function middleware(request: NextRequest) {
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value
+      getAll() {
+        return request.cookies.getAll()
       },
-      set(name: string, value: string, options: CookieOptions) {
-        request.cookies.set({ name, value, ...options })
-        response = NextResponse.next({ request: { headers: request.headers } })
-        response.cookies.set({ name, value, ...options })
-      },
-      remove(name: string, options: CookieOptions) {
-        request.cookies.set({ name, value: '', ...options })
-        response = NextResponse.next({ request: { headers: request.headers } })
-        response.cookies.set({ name, value: '', ...options })
+      setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value)
+        )
+        response = NextResponse.next({
+          request: { headers: request.headers },
+        })
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options)
+        )
       },
     },
   })
