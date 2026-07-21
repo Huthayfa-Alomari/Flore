@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import type { User } from '@supabase/supabase-js'
-import { ShoppingBag, Heart, Settings, LogOut, Store } from 'lucide-react'
+import { ShoppingBag, Heart, Settings, LogOut, Store, Camera, Loader2, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCart } from '@/hooks/useCart'
 import { Button } from '@/components/ui/Button'
@@ -24,9 +24,22 @@ export default function ProfilePage() {
   const supabase = supabaseRef.current
   const { clearCart } = useCart()
 
+  // حقول التعديل بتبويب الإعدادات (controlled inputs)
+  const [fullNameInput, setFullNameInput] = useState('')
+  const [phoneInput, setPhoneInput] = useState('')
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    if (data) setProfile(data as Profile)
+    if (data) {
+      setProfile(data as Profile)
+      setFullNameInput((data as Profile).full_name || '')
+      setPhoneInput((data as Profile).phone || '')
+    }
     setLoading(false)
   }, [supabase])
 
@@ -67,6 +80,66 @@ export default function ProfilePage() {
     router.push('/')
   }
 
+  const handleSaveProfile = async () => {
+    if (!user) return
+    setSavingProfile(true)
+    setSaveError('')
+    setSaveSuccess(false)
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ full_name: fullNameInput.trim() || null, phone: phoneInput.trim() || null })
+      .eq('id', user.id)
+
+    if (error) {
+      setSaveError('فشل حفظ التعديلات. حاول مجدداً')
+    } else {
+      setProfile((prev) => prev ? { ...prev, full_name: fullNameInput, phone: phoneInput } : prev)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    }
+    setSavingProfile(false)
+  }
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    if (file.size > 5 * 1024 * 1024) {
+      setSaveError('حجم الصورة يجب أن يكون أقل من 5 ميجابايت')
+      return
+    }
+
+    setUploadingAvatar(true)
+    setSaveError('')
+
+    try {
+      const ext = file.name.split('.').pop()
+      const fileName = `${user.id}-${Date.now()}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { cacheControl: '3600', upsert: false })
+
+      if (uploadError) throw new Error(uploadError.message)
+
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName)
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id)
+
+      if (updateError) throw new Error(updateError.message)
+
+      setProfile((prev) => prev ? { ...prev, avatar_url: publicUrl } : prev)
+    } catch {
+      setSaveError('فشل رفع الصورة. تأكد من إعداد مساحة التخزين وحاول مجدداً')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -85,8 +158,33 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-flore-bg py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="bg-flore-card rounded-3xl p-8 shadow-luxury mb-8 text-center">
-          <div className="w-20 h-20 rounded-full bg-flore-primary mx-auto mb-4 flex items-center justify-center text-white text-2xl font-bold">
-            {profile?.full_name?.[0] || user?.email?.[0] || 'ف'}
+          <div className="relative w-20 h-20 mx-auto mb-4">
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              className="relative w-20 h-20 rounded-full bg-flore-primary flex items-center justify-center text-white text-2xl font-bold overflow-hidden group"
+            >
+              {profile?.avatar_url ? (
+                <Image src={profile.avatar_url} alt="صورة البروفايل" fill className="object-cover" sizes="80px" />
+              ) : (
+                profile?.full_name?.[0] || user?.email?.[0] || 'ف'
+              )}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                {uploadingAvatar ? (
+                  <Loader2 className="h-5 w-5 text-white animate-spin" />
+                ) : (
+                  <Camera className="h-5 w-5 text-white" />
+                )}
+              </div>
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarChange}
+              className="hidden"
+            />
           </div>
           <h1 className="font-amiri text-2xl font-bold text-flore-text-primary mb-2">
             {profile?.full_name || user?.email?.split('@')[0] || 'مستخدم فلوري'}
@@ -175,7 +273,8 @@ export default function ProfilePage() {
                 <label className="block text-sm text-flore-text-secondary mb-1">الاسم الكامل</label>
                 <input
                   type="text"
-                  defaultValue={profile?.full_name || ''}
+                  value={fullNameInput}
+                  onChange={(e) => setFullNameInput(e.target.value)}
                   className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none"
                 />
               </div>
@@ -183,10 +282,29 @@ export default function ProfilePage() {
                 <label className="block text-sm text-flore-text-secondary mb-1">رقم الهاتف</label>
                 <input
                   type="tel"
-                  defaultValue={profile?.phone || ''}
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  dir="ltr"
                   className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none"
                 />
               </div>
+
+              {saveError && (
+                <p className="text-sm text-red-600 bg-red-50 p-3 rounded-xl text-center">{saveError}</p>
+              )}
+
+              <Button onClick={handleSaveProfile} disabled={savingProfile} className="w-full gap-2">
+                {savingProfile ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : saveSuccess ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    تم الحفظ
+                  </>
+                ) : (
+                  'حفظ التعديلات'
+                )}
+              </Button>
 
               {/* بوابة التجار (B2B) — تظهر فقط لأصحاب الأدوار المصرح لها */}
               {userRole && ['shop_owner', 'vendor', 'admin'].includes(userRole) && (
