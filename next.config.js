@@ -8,7 +8,8 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**.supabase.co',
+        hostname: 'rlktxwqxmwdostitaefo.supabase.co',
+        pathname: '/storage/v1/object/public/products/**',
       },
     ],
     formats: ['image/avif', 'image/webp'],
@@ -52,11 +53,11 @@ const nextConfig = {
 
 module.exports = process.env.SENTRY_DSN
   ? withSentryConfig(nextConfig, {
-      silent: true,
-      org: process.env.SENTRY_ORG,
-      project: process.env.SENTRY_PROJECT,
-      // لا نرفع خرائط المصدر (source maps) بدون توكن — تجنبًا لفشل البناء في بيئات بدون Sentry مُهيأ بالكامل
-      widenClientFileUpload: false,
-      disableLogger: true,
-    })
+    silent: true,
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    // لا نرفع خرائط المصدر (source maps) بدون توكن — تجنبًا لفشل البناء في بيئات بدون Sentry مُهيأ بالكامل
+    widenClientFileUpload: false,
+    disableLogger: true,
+  })
   : nextConfig
