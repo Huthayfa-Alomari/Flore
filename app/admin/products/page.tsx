@@ -53,6 +53,8 @@ export default function AdminProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [form, setForm] = useState<ProductForm>(emptyForm)
   const [images, setImages] = useState<ImageItem[]>([])
+  const [modelFile, setModelFile] = useState<File | null>(null)
+  const [modelPreviewName, setModelPreviewName] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -77,6 +79,8 @@ export default function AdminProductsPage() {
     setEditingProduct(null)
     setForm(emptyForm)
     setImages([])
+    setModelFile(null)
+    setModelPreviewName('')
     setShowForm(true)
   }
 
@@ -97,6 +101,8 @@ export default function AdminProductsPage() {
     // تحميل كل الصور الموجودة مسبقاً للمنتج (المعرض كامل، وليس صورة الغلاف فقط)
     const existingUrls = product.images && product.images.length > 0 ? product.images : (product.image ? [product.image] : [])
     setImages(existingUrls.map((url) => ({ url })))
+    setModelFile(null)
+    setModelPreviewName(product.model_url ? product.model_url.split('/').pop() || '' : '')
     setShowForm(true)
   }
 
@@ -155,6 +161,26 @@ export default function AdminProductsPage() {
     return urls
   }
 
+  // يرفع نموذج الـ AR الجديد لو تم اختيار ملف، وإلا يبقي رابط الموديل القديم كما هو عند التعديل
+  const uploadModel = async (): Promise<string | null> => {
+    if (!modelFile) {
+      return editingProduct?.model_url || null
+    }
+
+    setUploadProgress('جاري رفع نموذج الـ 3D...')
+    const ext = modelFile.name.split('.').pop()
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+
+    const { error } = await supabase.storage
+      .from('product-models')
+      .upload(fileName, modelFile, { cacheControl: '3600', upsert: false })
+
+    if (error) throw new Error(`فشل رفع النموذج: ${error.message}`)
+
+    const { data: { publicUrl } } = supabase.storage.from('product-models').getPublicUrl(fileName)
+    return publicUrl
+  }
+
   const handleSave = async () => {
     if (!form.name.trim() || !form.price.trim()) {
       alert('اسم المنتج والسعر مطلوبان')
@@ -164,12 +190,17 @@ export default function AdminProductsPage() {
       alert('أضف صورة واحدة على الأقل')
       return
     }
+    if (form.ar_enabled && !modelFile && !editingProduct?.model_url) {
+      alert('لتفعيل AR، ارفع ملف نموذج ثلاثي الأبعاد')
+      return
+    }
 
     setSaving(true)
     setUploadProgress('')
 
     try {
       const imageUrls = await uploadAllImages()
+      const modelUrl = await uploadModel()
       setUploadProgress('جاري حفظ المنتج...')
 
       const productData = {
@@ -185,7 +216,7 @@ export default function AdminProductsPage() {
         badge: form.badge || null,
         badge_color: form.badge_color || null,
         in_stock: form.in_stock,
-        model_url: null,
+        model_url: modelUrl,
         ar_enabled: form.ar_enabled,
       }
 
@@ -417,7 +448,41 @@ export default function AdminProductsPage() {
                       />
                       متوفر
                     </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={form.ar_enabled}
+                        onChange={e => setForm({ ...form, ar_enabled: e.target.checked })}
+                        className="rounded"
+                      />
+                      تفعيل AR
+                    </label>
                   </div>
+
+                  {form.ar_enabled && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        نموذج ثلاثي الأبعاد (.glb أو .usdz)
+                      </label>
+                      <input
+                        type="file"
+                        accept=".glb,.usdz,model/gltf-binary,model/vnd.usdz+zip"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            setModelFile(file)
+                            setModelPreviewName(file.name)
+                          }
+                        }}
+                        className="text-sm w-full"
+                      />
+                      {modelPreviewName && (
+                        <p className="text-xs text-flore-text-secondary mt-1">
+                          الملف المحدد: {modelPreviewName}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
