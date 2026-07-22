@@ -43,14 +43,16 @@ const categories: { value: Product['category']; label: string }[] = [
   { value: 'chocolates', label: 'شوكولاتة' },
 ]
 
+// عنصر صورة واحد داخل معرض الصور: إما ملف جديد لم يُرفع بعد، أو رابط موجود مسبقاً (عند التعديل)
+type ImageItem = { file: File; preview: string } | { url: string }
+
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [form, setForm] = useState<ProductForm>(emptyForm)
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string>('')
+  const [images, setImages] = useState<ImageItem[]>([])
   const [saving, setSaving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -74,8 +76,7 @@ export default function AdminProductsPage() {
   const openAddForm = () => {
     setEditingProduct(null)
     setForm(emptyForm)
-    setImageFile(null)
-    setImagePreview('')
+    setImages([])
     setShowForm(true)
   }
 
@@ -93,44 +94,65 @@ export default function AdminProductsPage() {
       in_stock: product.in_stock,
       ar_enabled: product.ar_enabled,
     })
-    setImageFile(null)
-    setImagePreview(product.image || '')
+    // تحميل كل الصور الموجودة مسبقاً للمنتج (المعرض كامل، وليس صورة الغلاف فقط)
+    const existingUrls = product.images && product.images.length > 0 ? product.images : (product.image ? [product.image] : [])
+    setImages(existingUrls.map((url) => ({ url })))
     setShowForm(true)
   }
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  // يسمح باختيار عدة صور دفعة واحدة، ويضيفها فوق أي صور محددة مسبقاً بدل استبدالها
+  const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('حجم الصورة يجب أن يكون أقل من 5 ميجابايت')
+    const oversized = files.find((f) => f.size > 5 * 1024 * 1024)
+    if (oversized) {
+      alert(`الصورة "${oversized.name}" أكبر من 5 ميجابايت`)
       return
     }
 
-    setImageFile(file)
-    const reader = new FileReader()
-    reader.onload = () => setImagePreview(reader.result as string)
-    reader.readAsDataURL(file)
+    const newItems: ImageItem[] = files.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file), // أخف وأسرع من base64 وأكثر توافقاً مع next/image
+    }))
+    setImages((prev) => [...prev, ...newItems])
+    e.target.value = '' // للسماح باختيار نفس الملف مرة أخرى لاحقاً لو احتاج المستخدم لحذفه وإعادة إضافته
   }
 
-  const uploadImage = async (): Promise<string> => {
-    if (!imageFile) return editingProduct?.image || ''
+  const removeImage = (index: number) => {
+    setImages((prev) => {
+      const item = prev[index]
+      if ('preview' in item) URL.revokeObjectURL(item.preview)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
 
-    setUploadProgress('جاري رفع الصورة...')
-    const ext = imageFile.name.split('.').pop()
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  // يرفع كل الصور الجديدة (اللي لسا ملفات محلية) بالتوازي، ويبقي روابط الصور القديمة كما هي
+  const uploadAllImages = async (): Promise<string[]> => {
+    const urls: string[] = []
 
-    const { error } = await supabase.storage
-      .from('products')
-      .upload(fileName, imageFile, { cacheControl: '3600', upsert: false })
+    for (let i = 0; i < images.length; i++) {
+      const item = images[i]
+      if ('url' in item) {
+        urls.push(item.url)
+        continue
+      }
 
-    if (error) throw new Error('فشل رفع الصورة: ' + error.message)
+      setUploadProgress(`جاري رفع الصورة ${i + 1} من ${images.length}...`)
+      const ext = item.file.name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('products')
-      .getPublicUrl(fileName)
+      const { error } = await supabase.storage
+        .from('products')
+        .upload(fileName, item.file, { cacheControl: '3600', upsert: false })
 
-    return publicUrl
+      if (error) throw new Error(`فشل رفع الصورة ${i + 1}: ${error.message}`)
+
+      const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(fileName)
+      urls.push(publicUrl)
+    }
+
+    return urls
   }
 
   const handleSave = async () => {
@@ -138,12 +160,16 @@ export default function AdminProductsPage() {
       alert('اسم المنتج والسعر مطلوبان')
       return
     }
+    if (images.length === 0) {
+      alert('أضف صورة واحدة على الأقل')
+      return
+    }
 
     setSaving(true)
     setUploadProgress('')
 
     try {
-      const imageUrl = await uploadImage()
+      const imageUrls = await uploadAllImages()
       setUploadProgress('جاري حفظ المنتج...')
 
       const productData = {
@@ -152,12 +178,12 @@ export default function AdminProductsPage() {
         category: form.category,
         price: parseFloat(form.price),
         currency: 'JOD',
-        image: imageUrl,
-        images: [imageUrl],
+        image: imageUrls[0], // صورة الغلاف = أول صورة بالمعرض
+        images: imageUrls,
         description: form.description || null,
         description_en: form.description_en || null,
         badge: form.badge || null,
-        badge_color: form.badge_color || null, // 🐛 كان يخزّن نص الشارة (form.badge) بدل اللون فعليًا
+        badge_color: form.badge_color || null,
         in_stock: form.in_stock,
         model_url: null,
         ar_enabled: form.ar_enabled,
@@ -237,28 +263,56 @@ export default function AdminProductsPage() {
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                {/* صورة المنتج */}
+                {/* معرض صور المنتج (يدعم أكثر من صورة) */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">صورة المنتج</label>
+                  <label className="block text-sm font-medium mb-2">
+                    صور المنتج {images.length > 0 && `(${images.length})`}
+                  </label>
+
+                  {images.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {images.map((item, index) => (
+                        <div key={index} className="relative aspect-square rounded-xl overflow-hidden border-2 border-flore-border group">
+                          <Image
+                            src={'preview' in item ? item.preview : item.url}
+                            alt={`صورة ${index + 1}`}
+                            fill
+                            unoptimized
+                            className="object-cover"
+                          />
+                          {index === 0 && (
+                            <span className="absolute bottom-1 right-1 bg-flore-primary text-white text-[10px] px-2 py-0.5 rounded-full">
+                              الغلاف
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute top-1 left-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div
                     onClick={() => fileInputRef.current?.click()}
                     className="relative aspect-[4/3] rounded-2xl border-2 border-dashed border-flore-border hover:border-flore-primary cursor-pointer overflow-hidden bg-flore-bg flex items-center justify-center transition-colors"
                   >
-                    {imagePreview ? (
-                      <Image src={imagePreview} alt="preview" fill className="object-cover" />
-                    ) : (
-                      <div className="text-center text-flore-text-secondary">
-                        <Upload className="h-10 w-10 mx-auto mb-2" />
-                        <p className="text-sm">اضغط لرفع صورة</p>
-                        <p className="text-xs mt-1">JPG, PNG, WebP - حتى 5MB</p>
-                      </div>
-                    )}
+                    <div className="text-center text-flore-text-secondary">
+                      <Upload className="h-10 w-10 mx-auto mb-2" />
+                      <p className="text-sm">{images.length > 0 ? 'اضغط لإضافة صور أخرى' : 'اضغط لرفع صورة أو أكثر'}</p>
+                      <p className="text-xs mt-1">JPG, PNG, WebP - حتى 5MB لكل صورة</p>
+                    </div>
                   </div>
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    onChange={handleImageChange}
+                    multiple
+                    onChange={handleImagesChange}
                     className="hidden"
                   />
                 </div>
