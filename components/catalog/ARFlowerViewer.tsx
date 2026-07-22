@@ -103,11 +103,12 @@ export function ARFlowerViewer({ modelUrl, posterUrl, onClose }: ARFlowerViewerP
             auto-rotate
             ar
             ar-modes="webxr scene-viewer quick-look"
+            ar-scale="fixed"
+            ar-placement="floor"
             touch-action="pan-y"
             shadow-intensity="1.5"
             exposure="0.9"
             style={{ width: '100%', height: '100%', position: 'relative', zIndex: 10 }}
-            // تفعيل الـ Loading State برمجياً عند اكتمال جلب الـ Asset
             onload={() => setIsModelLoaded(true)}
           />
 
