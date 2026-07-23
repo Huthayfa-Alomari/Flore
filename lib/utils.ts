@@ -44,7 +44,9 @@ export const categories = [
   { id: 'preserved', label: 'زهور محفوظة' },
   { id: 'vases', label: 'مزهريات' },
   { id: 'chocolates', label: 'شوكولاتة' },
-  { id: 'custom', label: 'تنسيق خاص' }
+  { id: 'custom', label: 'تنسيق خاص' },
+  { id: 'accessories', label: 'إكسسوارات' },
+  { id: 'plants', label: 'نباتات' }
 ] as const;
 
 // 5. حالات الطلب الفاخرة مع الألوان والتوطين باللغة العربية

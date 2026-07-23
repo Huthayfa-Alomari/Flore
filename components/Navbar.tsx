@@ -21,6 +21,8 @@ export function Navbar() {
   const links = [
     { href: '/', label: 'الرئيسية' },
     { href: '/catalog', label: 'المجموعة' },
+    { href: '/accessories', label: 'الإكسسوارات' },
+    { href: '/plants', label: 'النباتات' },
     { href: '/atelier', label: 'الأتيليه' },
     { href: '/ar', label: 'AR' },
   ]

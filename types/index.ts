@@ -2,7 +2,7 @@ export interface Product {
   id: string;
   name: string;
   name_en: string | null;
-  category: 'bouquets' | 'preserved' | 'vases' | 'chocolates' | 'custom';
+  category: 'bouquets' | 'preserved' | 'vases' | 'chocolates' | 'custom' | 'accessories' | 'plants';
   price: number;
   currency: string;
   image: string;

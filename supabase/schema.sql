@@ -29,7 +29,7 @@ CREATE TABLE products (
     name TEXT NOT NULL,
     name_en TEXT,
     category TEXT NOT NULL DEFAULT 'bouquets'
-        CHECK (category IN ('bouquets', 'preserved', 'vases', 'chocolates', 'custom')),
+        CHECK (category IN ('bouquets', 'preserved', 'vases', 'chocolates', 'custom', 'accessories', 'plants')),
     price NUMERIC NOT NULL,
     currency TEXT NOT NULL DEFAULT 'JOD',
     image TEXT NOT NULL DEFAULT '',

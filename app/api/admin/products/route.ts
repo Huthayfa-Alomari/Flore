@@ -26,7 +26,7 @@ async function checkAdmin(supabase: SupabaseServerClient) {
 const ProductSchema = z.object({
   name: z.string().min(1).max(200),
   name_en: z.string().max(200).optional().nullable(),
-  category: z.enum(['bouquets', 'preserved', 'vases', 'chocolates', 'custom']),
+  category: z.enum(['bouquets', 'preserved', 'vases', 'chocolates', 'custom', 'accessories', 'plants']),
   price: z.number().positive().max(10000),
   currency: z.string().max(10).optional(),
   image: z.string().max(2000),

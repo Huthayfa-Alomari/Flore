@@ -41,6 +41,8 @@ const categories: { value: Product['category']; label: string }[] = [
   { value: 'preserved', label: 'محفوظة' },
   { value: 'vases', label: 'مزهرية' },
   { value: 'chocolates', label: 'شوكولاتة' },
+  { value: 'accessories', label: 'إكسسوارات' },
+  { value: 'plants', label: 'نباتات' },
 ]
 
 // عنصر صورة واحد داخل معرض الصور: إما ملف جديد لم يُرفع بعد، أو رابط موجود مسبقاً (عند التعديل)
