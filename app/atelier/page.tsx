@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useCart } from '@/lib/store/cart-store'
 import { formatPrice } from '@/lib/utils'
@@ -172,9 +173,12 @@ export default function AtelierPage() {
     }, 800)
   }
 
-  const bouquetColors = Object.entries(selectedFlowers).flatMap(([id, qty]) => {
+  const bouquetPreviewItems = Object.entries(selectedFlowers).flatMap(([id, qty]) => {
     const flower = flowers.find(f => f.id === id)
-    return Array(Math.min(qty, 8)).fill(flower?.color || '#ff6b9d')
+    return Array(Math.min(qty, 8)).fill({
+      color: flower?.color || '#ff6b9d',
+      image: flower?.image || null,
+    })
   })
 
   if (loading) return (
@@ -224,8 +228,14 @@ export default function AtelierPage() {
                         }`}
                     >
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-8 h-8 rounded-full flex-shrink-0 shadow-sm"
-                          style={{ backgroundColor: flower.color || '#ff6b9d' }} />
+                        {flower.image ? (
+                          <div className="relative w-10 h-10 rounded-full flex-shrink-0 shadow-sm overflow-hidden">
+                            <Image src={flower.image} alt={flower.name_ar || flower.name} fill className="object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-full flex-shrink-0 shadow-sm"
+                            style={{ backgroundColor: flower.color || '#ff6b9d' }} />
+                        )}
                         <div>
                           <p className="font-bold text-sm text-flore-text-primary">{flower.name_ar || flower.name}</p>
                           <p className="text-flore-primary text-sm font-semibold">{formatPrice(flower.price)}</p>
@@ -308,14 +318,17 @@ export default function AtelierPage() {
               <h3 className="font-amiri text-xl font-bold text-flore-primary mb-4 text-center">معاينة الباقة</h3>
 
               <div className="flex flex-wrap justify-center gap-2 min-h-[120px] items-center mb-4 p-3 bg-flore-bg rounded-2xl">
-                {bouquetColors.length === 0 ? (
+                {bouquetPreviewItems.length === 0 ? (
                   <p className="text-flore-text-secondary text-sm text-center">اختر زهوراً لتظهر هنا</p>
                 ) : (
-                  bouquetColors.map((color, i) => (
-                    <div key={i}
-                      className="w-8 h-8 rounded-full shadow-md transition-all hover:scale-110"
-                      style={{ backgroundColor: color }}
-                    />
+                  bouquetPreviewItems.map((item, i) => (
+                    <div key={i} className="relative w-8 h-8 rounded-full shadow-md transition-all hover:scale-110 overflow-hidden">
+                      {item.image ? (
+                        <Image src={item.image} alt="" fill className="object-cover" />
+                      ) : (
+                        <div className="w-full h-full" style={{ backgroundColor: item.color }} />
+                      )}
+                    </div>
                   ))
                 )}
               </div>
