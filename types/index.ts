@@ -27,20 +27,25 @@ export interface CartItem {
     vase: string;
     message?: string;
   };
+  bouquetSelection?: {
+    flowers: { id: string; qty: number }[];
+    wrapId: string | null;
+    vaseId: string | null;
+  };
 }
 
 export interface OrderItem {
-  product_id: string
-  name: string
-  image: string
-  price: number
-  qty: number
+  product_id: string;
+  name: string;
+  image: string;
+  price: number;
+  qty: number;
   customization?: {
-    flowers: string[]
-    wrap: string
-    vase: string
-    message?: string
-  } | null
+    flowers: string[];
+    wrap: string;
+    vase: string;
+    message?: string;
+  } | null;
 }
 
 export interface Order {

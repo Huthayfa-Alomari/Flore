@@ -84,6 +84,7 @@ export default function CheckoutPage() {
             product_id: item.product.id,
             qty: item.quantity,
             customization: item.customization || null,
+            ...(item.bouquetSelection && { bouquet_selection: item.bouquetSelection }),
           })),
           customer_name: form.name,
           customer_phone: form.phone,
@@ -97,7 +98,10 @@ export default function CheckoutPage() {
 
       if (!response.ok) {
         const err = await response.json()
-        throw new Error(err.error || 'Failed to create order')
+        const message = typeof err.error === 'string'
+          ? err.error
+          : 'بيانات الطلب غير صحيحة، يرجى المراجعة'
+        throw new Error(message)
       }
 
       const { orderId, total: serverTotal } = await response.json()
@@ -118,7 +122,12 @@ export default function CheckoutPage() {
           body: JSON.stringify({ orderId, phoneNumber: form.phone }),
         })
         const cliqData = await cliqRes.json()
-        if (!cliqRes.ok) throw new Error(cliqData.error || 'Failed to initialize CliQ payment')
+        if (!cliqRes.ok) {
+          const cliqMsg = typeof cliqData.error === 'string'
+            ? cliqData.error
+            : 'فشل في بدء عملية الدفع عبر CliQ'
+          throw new Error(cliqMsg)
+        }
         clearCart()
         if (cliqData.paymentUrl) {
           window.location.href = cliqData.paymentUrl
@@ -135,7 +144,7 @@ export default function CheckoutPage() {
 
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'حدث خطأ أثناء معالجة الطلب'
-      console.error('Checkout error:', message)
+      console.error('Checkout error:', err)
       alert(message + ' — يرجى المحاولة مرة أخرى أو التواصل معنا مباشرة.')
     } finally {
       setLoading(false)
@@ -240,8 +249,8 @@ export default function CheckoutPage() {
                     key={method.id} type="button"
                     onClick={() => setForm(prev => ({ ...prev, payment: method.id }))}
                     className={`rounded-2xl p-4 text-center border-2 transition-all duration-200 flex flex-col items-center justify-center ${isSelected
-                        ? 'border-flore-primary bg-purple-50/40 shadow-sm scale-[1.02]'
-                        : 'border-flore-border bg-flore-card hover:border-flore-primary/50'
+                      ? 'border-flore-primary bg-purple-50/40 shadow-sm scale-[1.02]'
+                      : 'border-flore-border bg-flore-card hover:border-flore-primary/50'
                       }`}
                   >
                     <Icon className={`h-6 w-6 mb-2 ${isSelected ? 'text-flore-primary' : 'text-flore-text-secondary'}`} />

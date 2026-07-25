@@ -1,18 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Product } from '@/types'
+import type { CartItem } from '@/types'
 
-// أضفنا export هنا لنستخدم نفس الـ Type في ملف الـ utils والدوال الأخرى
-export interface CartItem {
-  product: Product
-  quantity: number
-  customization?: {
-    flowers: string[]
-    wrap: string
-    vase: string
-    message?: string
-  }
-}
+export type { CartItem }
 
 interface CartState {
   items: CartItem[]

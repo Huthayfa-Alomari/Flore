@@ -165,6 +165,11 @@ export default function AtelierPage() {
         vase: vase?.name_ar || vase?.name || '',
         message: giftMessage,
       },
+      bouquetSelection: {
+        flowers: Object.entries(selectedFlowers).map(([id, qty]) => ({ id, qty })),
+        wrapId: selectedWrap,
+        vaseId: selectedVase,
+      },
     })
 
     setAdded(true)
