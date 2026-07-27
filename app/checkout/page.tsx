@@ -116,25 +116,16 @@ export default function CheckoutPage() {
         router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
 
       } else if (form.payment === 'cliq') {
-        const cliqRes = await fetch('/api/payment/cliq', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId, phoneNumber: form.phone }),
-        })
-        const cliqData = await cliqRes.json()
-        if (!cliqRes.ok) {
-          const cliqMsg = typeof cliqData.error === 'string'
-            ? cliqData.error
-            : 'فشل في بدء عملية الدفع عبر CliQ'
-          throw new Error(cliqMsg)
-        }
+        // الدفع عبر CliQ يتم يدوياً حالياً (لا يوجد تكامل API مباشر مع CliQ للتجار الأفراد)
+        // نوجّه العميل للتحويل على الـ alias، ثم نفتح واتساب لإرسال إثبات التحويل وتأكيد الطلب
+        const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '962790000000'
+        const cliqMessage = `مرحباً، حوّلت مبلغ ${formatPrice(orderTotal)} عبر CliQ لطلب رقم #${orderId.slice(0, 8)}\nمرفق لقطة الشاشة للتأكيد 🌸`
+        const cliqWhatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(cliqMessage)}`
+
+        alert(`تم تسجيل طلبك بنجاح 🌸\n\nيرجى تحويل المبلغ عبر CliQ إلى:\nAlias: HUTHYFAO\n\nبعدها سيتم فتح واتساب لإرسال لقطة شاشة التحويل لتأكيد طلبك.`)
+        window.open(cliqWhatsappUrl, '_blank')
         clearCart()
-        if (cliqData.paymentUrl) {
-          window.location.href = cliqData.paymentUrl
-        } else {
-          alert('تم تسجيل طلبك بنجاح 🌸. سيتم إرسال تفاصيل الدفع عبر تطبيق CliQ.')
-          router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
-        }
+        router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
 
       } else if (form.payment === 'cash') {
         alert('تم تسجيل طلبك بنجاح 🌸. سيتم الدفع نقداً عند استلام الباقة الفاخرة.')
@@ -153,7 +144,7 @@ export default function CheckoutPage() {
 
   const paymentMethods = [
     { id: 'whatsapp', label: 'واتساب', icon: MessageCircle, desc: 'تأكيد فوري وفاتورة مباشرة' },
-    { id: 'cliq', label: 'تطبيق CliQ', icon: Banknote, desc: 'تحويل بنكي أردني فوري' },
+    { id: 'cliq', label: 'تطبيق CliQ', icon: Banknote, desc: 'تحويل يدوي عبر الـ Alias' },
     { id: 'cash', label: 'كاش عند الاستلام', icon: Banknote, desc: 'الدفع نقداً لسائق فلوري' },
   ]
 
@@ -264,6 +255,16 @@ export default function CheckoutPage() {
                 )
               })}
             </div>
+
+            {form.payment === 'cliq' && (
+              <div className="mt-4 p-4 bg-flore-bg rounded-xl border border-flore-border text-center">
+                <p className="text-sm text-flore-text-secondary mb-1">حوّل عبر تطبيق بنكك إلى:</p>
+                <p className="font-bold text-flore-primary text-lg" dir="ltr">HUTHYFAO</p>
+                <p className="text-xs text-flore-text-secondary mt-2">
+                  بعد إتمام الطلب سيُفتح واتساب تلقائياً لإرسال إثبات التحويل
+                </p>
+              </div>
+            )}
           </section>
 
           {/* رسالة الإهداء */}
