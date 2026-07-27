@@ -109,7 +109,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning className={`${amiri.variable} ${noto.variable} ${playfair.variable} ...`}>
+    <html lang="ar" dir="rtl" suppressHydrationWarning className={`${amiri.variable} ${noto.variable} ${playfair.variable} ${inter.variable}`}>
       {/* تم إفراغ الـ <head> اليدوي لتجنب تحذيرات الـ Console وأخطاء مطابقة الـ Server/Client */}
       <body className="font-noto bg-flore-bg text-flore-text-primary min-h-screen">
         <ThemeProvider attribute="data-theme" defaultTheme="system" enableSystem>
