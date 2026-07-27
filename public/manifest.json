@@ -5,7 +5,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FAF9F6",
-  "theme_color": "#0D5C63",
+  "theme_color": "#A8813C",
   "orientation": "portrait",
   "scope": "/",
   "lang": "ar",
@@ -24,5 +24,8 @@
       "purpose": "maskable any"
     }
   ],
-  "categories": ["shopping", "lifestyle"]
+  "categories": [
+    "shopping",
+    "lifestyle"
+  ]
 }

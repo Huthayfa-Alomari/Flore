@@ -117,7 +117,7 @@ npm run test:ui
 
 ## 🎨 Design System
 
-- **Primary**: Deep Teal (#0D5C63)
+- **Primary**: Deep Teal (#A8813C)
 - **Gold**: Soft Gold (#E7D8B9)
 - **Background**: Ivory White (#FAF9F6)
 - **Typography**: Amiri (Arabic headings), Noto Sans Arabic (body)

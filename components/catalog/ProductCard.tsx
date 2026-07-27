@@ -42,7 +42,7 @@ export function ProductCard({ product }: ProductCardProps) {
                 <Badge
                   variant="default"
                   className="text-white"
-                  style={{ backgroundColor: product.badge_color || '#0D5C63' }}
+                  style={{ backgroundColor: product.badge_color || '#A8813C' }}
                 >
                   {product.badge}
                 </Badge>

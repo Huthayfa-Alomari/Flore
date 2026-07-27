@@ -3,14 +3,14 @@
 @tailwind utilities;
 
 :root {
-  --flore-primary: #0D5C63;
+  --flore-primary: #A8813C;
   --flore-primary-dark: #084549;
   --flore-gold: #E7D8B9;
   --flore-gold-dark: #C9A962;
   --flore-bg: #FAF9F6;
   --flore-card: #FFFFFF;
   --flore-subtle: #F5E6E8;
-  --flore-text-primary: #0D5C63;
+  --flore-text-primary: #A8813C;
   --flore-text-secondary: #6E7B7D;
   --flore-border: #E8E8E8;
   --flore-shadow: 0 4px 24px rgba(13, 92, 99, 0.08);
@@ -37,7 +37,12 @@
     @apply bg-flore-bg text-flore-text-primary;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-amiri font-bold;
   }
 }

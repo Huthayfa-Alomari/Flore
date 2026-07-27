@@ -124,7 +124,7 @@ export default function ProductDetailPage() {
             {product.badge && (
               <div className="absolute top-4 right-4">
                 <Badge
-                  style={{ backgroundColor: product.badge_color || '#0D5C63' }}
+                  style={{ backgroundColor: product.badge_color || '#A8813C' }}
                   className="text-white"
                 >
                   {product.badge}

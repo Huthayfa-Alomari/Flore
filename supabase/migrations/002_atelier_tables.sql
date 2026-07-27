@@ -79,7 +79,7 @@ INSERT INTO flower_types (name, name_ar, price, color, in_stock) VALUES
 
 INSERT INTO wrap_options (name, name_ar, price, color, in_stock) VALUES
 ('Kraft Paper', 'ورق كرافت', 3.00, '#C19A6B', true),
-('Silk Ribbon Wrap', 'تغليف حرير', 6.00, '#0D5C63', true),
+('Silk Ribbon Wrap', 'تغليف حرير', 6.00, '#A8813C', true),
 ('Luxury Box', 'صندوق فاخر', 10.00, '#E7D8B9', true);
 
 INSERT INTO vase_options (name, name_ar, price, image, in_stock) VALUES
