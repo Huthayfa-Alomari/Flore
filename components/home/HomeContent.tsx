@@ -9,12 +9,12 @@ import { ProductCard } from '@/components/catalog/ProductCard'
 import type { Product } from '@/types'
 
 const categories = [
-    { id: 'bouquets', label: 'باقات', icon: Flower2, image: 'https://pin.it/1ocR9qNb7' },
-    { id: 'preserved', label: 'محفوظة', icon: Sparkles, image: 'https://pin.it/247gubVg7' },
-    { id: 'vases', label: 'مزهريات', icon: Eye, image: 'https://pin.it/3ep9rxAnk' },
-    { id: 'chocolates', label: 'هدايا', icon: Flower2, image: 'https://pin.it/57bw8v3tt' },
-    { id: 'accessories', label: 'إكسسوارات', icon: Sparkles, image: 'https://pin.it/7xktgB2qa' },
-    { id: 'plants', label: 'نباتات', icon: Flower2, image: 'https://pin.it/2bT3p197x' },
+    { id: 'bouquets', label: 'باقات', icon: Flower2, image: 'https://i.pinimg.com/736x/be/3e/86/be3e86ae7397e687d7a3a3e102263e17.jpg' },
+    { id: 'preserved', label: 'محفوظة', icon: Sparkles, image: 'https://i.pinimg.com/1200x/9f/70/1e/9f701e0af1c23c0ec9199e73fdaf7b59.jpg' },
+    { id: 'vases', label: 'مزهريات', icon: Eye, image: 'https://i.pinimg.com/736x/a0/1f/e0/a01fe02e25dc4ba07fdee159e14c4e16.jpg' },
+    { id: 'chocolates', label: 'هدايا', icon: Flower2, image: 'https://i.pinimg.com/1200x/3a/f7/37/3af737be180f61c74995b45542ddcb26.jpg' },
+    { id: 'accessories', label: 'إكسسوارات', icon: Sparkles, image: 'https://i.pinimg.com/1200x/aa/54/9c/aa549ce762e8b2acf64302de1ec1cf7f.jpg' },
+    { id: 'plants', label: 'نباتات', icon: Flower2, image: 'https://i.pinimg.com/control1/736x/7c/4f/01/7c4f016dd19aa239f327a33ab3f4a828.jpg' },
 
 ]
 
@@ -25,12 +25,12 @@ const testimonials = [
 ]
 
 const galleryImages = [
-    'https://pin.it/5gs69TN5o',
-    'https://pin.it/Wi7rLYD01',
-    'https://pin.it/4yqCd1TKu',
-    'https://pin.it/5Kd9i8c0t',
-    'https://pin.it/7ClQwkTbt',
-    'https://pin.it/7ufIFwX8v',
+    'https://i.pinimg.com/control1/1200x/49/79/2a/49792a35f698e62abd2546f0ba68736d.jpg',
+    'https://i.pinimg.com/1200x/de/89/38/de8938e4818671c45928aa4d248e1198.jpg',
+    'https://i.pinimg.com/736x/50/5b/99/505b99251b8d8251e64f36653bd92f42.jpg',
+    'https://i.pinimg.com/736x/6b/7c/96/6b7c96aac5cc08b279c6477785ffa9a6.jpg',
+    'https://i.pinimg.com/control1/1200x/0c/69/9b/0c699b0a8e613373d7e83deb1d05c281.jpg',
+    'https://i.pinimg.com/1200x/fb/93/39/fb93399121d11c6b444494f33e5f34d2.jpg',
 ]
 
 interface HomeContentProps {
@@ -171,7 +171,7 @@ export default function HomeContent({ featuredProducts }: HomeContentProps) {
                         </div>
                         <div className="relative aspect-square bg-flore-bg rounded-2xl overflow-hidden">
                             <Image
-                                src="https://pin.it/1W2NP5ZfG"
+                                src="https://i.pinimg.com/control1/1200x/23/c4/aa/23c4aa9c0ae3b702a1366178e41228b3.jpg"
                                 alt="AR Preview"
                                 fill
                                 sizes="(max-w-768px) 100vw, 50vw"

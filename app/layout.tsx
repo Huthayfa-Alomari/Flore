@@ -99,8 +99,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#FAF9F6' },
-    { media: '(prefers-color-scheme: dark)', color: '#1A1F1E' },
+    { media: '(prefers-color-scheme: light)', color: '#FBF7F1' },
+    { media: '(prefers-color-scheme: dark)', color: '#1A1714' },
   ],
   width: 'device-width',
   initialScale: 1,
@@ -109,7 +109,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" className={`${amiri.variable} ${noto.variable} ${playfair.variable} ${inter.variable}`}>
+    <html lang="ar" dir="rtl" suppressHydrationWarning className={`${amiri.variable} ${noto.variable} ${playfair.variable} ...`}>
       {/* تم إفراغ الـ <head> اليدوي لتجنب تحذيرات الـ Console وأخطاء مطابقة الـ Server/Client */}
       <body className="font-noto bg-flore-bg text-flore-text-primary min-h-screen">
         <ThemeProvider attribute="data-theme" defaultTheme="system" enableSystem>

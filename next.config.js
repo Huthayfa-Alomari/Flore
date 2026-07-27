@@ -11,6 +11,10 @@ const nextConfig = {
         hostname: 'rlktxwqxmwdostitaefo.supabase.co',
         pathname: '/storage/v1/object/public/products/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'i.pinimg.com', // ✅ تم إضافته بشكل صحيح داخل المصفوفة
+      },
     ],
     formats: ['image/avif', 'image/webp'],
   },
