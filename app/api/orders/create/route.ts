@@ -16,8 +16,13 @@ const BouquetSelectionSchema = z.object({
         id: z.string().uuid(),
         qty: z.number().int().min(1).max(50),
     })).min(1).max(30),
+    greenery: z.array(z.object({
+        id: z.string().uuid(),
+        qty: z.number().int().min(1).max(50),
+    })).max(30).optional(),
     wrapId: z.string().uuid().nullable().optional(),
     vaseId: z.string().uuid().nullable().optional(),
+    sizeKey: z.string().max(50).optional(),
 })
 
 const OrderItemSchema = z.object({
@@ -79,7 +84,6 @@ export async function POST(request: NextRequest) {
     const realItems = items.filter((i) => !isCustomItem(i.product_id))
     const customItems = items.filter((i) => isCustomItem(i.product_id))
 
-    // كل عنصر مخصص لازم يحمل bouquet_selection — بدون سعر أو اسم موثوق من المتصفح إطلاقاً
     for (const item of customItems) {
         if (!item.bouquet_selection) {
             return NextResponse.json(
@@ -89,7 +93,7 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // ---- تحقق المنتجات العادية (كما كان) ----
+    // ---- تحقق المنتجات العادية ----
     let productMap = new Map<string, { id: string; price: number; in_stock: boolean; name: string; image: string }>()
 
     if (realItems.length > 0) {
@@ -123,48 +127,60 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // ---- تحقق وحساب الباقات المخصصة من قاعدة البيانات مباشرة (المصدر الوحيد الموثوق للسعر) ----
+    // ---- تحقق وحساب الباقات المخصصة من قاعدة البيانات مباشرة ----
     type FlowerRow = { id: string; name: string; name_ar: string | null; price: number; image: string | null; in_stock: boolean }
-    type WrapRow = { id: string; name: string; name_ar: string | null; price: number; in_stock: boolean }
-    type VaseRow = { id: string; name: string; name_ar: string | null; price: number; in_stock: boolean }
+    type GreeneryRow = { id: string; name: string; name_ar: string | null; price: number; in_stock: boolean }
+    type ContainerRow = { id: string; name: string; name_ar: string | null; price: number; in_stock: boolean }
+    type SizeRow = { key: string; label_ar: string; price_multiplier: number }
 
     let flowerMap = new Map<string, FlowerRow>()
-    let wrapMap = new Map<string, WrapRow>()
-    let vaseMap = new Map<string, VaseRow>()
+    let greeneryMap = new Map<string, GreeneryRow>()
+    let containerMap = new Map<string, ContainerRow>()
+    let sizeMap = new Map<string, SizeRow>()
 
     if (customItems.length > 0) {
         const allFlowerIds = Array.from(new Set(
             customItems.flatMap((i) => i.bouquet_selection!.flowers.map((f) => f.id))
         ))
-        const allWrapIds = Array.from(new Set(
-            customItems.map((i) => i.bouquet_selection!.wrapId).filter((id): id is string => !!id)
+        const allGreeneryIds = Array.from(new Set(
+            customItems.flatMap((i) => i.bouquet_selection!.greenery?.map((g) => g.id) || [])
         ))
-        const allVaseIds = Array.from(new Set(
+        // ملاحظة: vaseId يمثل الآن "الحاوية الموحّدة" (سلة/مزهرية/تغليف/صندوق) — نقرأها من vase_options
+        const allContainerIds = Array.from(new Set(
             customItems.map((i) => i.bouquet_selection!.vaseId).filter((id): id is string => !!id)
         ))
+        const allSizeKeys = Array.from(new Set(
+            customItems.map((i) => i.bouquet_selection!.sizeKey).filter((k): k is string => !!k)
+        ))
 
-        const [flowersRes, wrapsRes, vasesRes] = await Promise.all([
+        const [flowersRes, greeneryRes, containersRes, sizesRes] = await Promise.all([
             allFlowerIds.length
                 ? supabase.from('flower_types').select('id, name, name_ar, price, image, in_stock').in('id', allFlowerIds)
                 : Promise.resolve({ data: [], error: null }),
-            allWrapIds.length
-                ? supabase.from('wrap_options').select('id, name, name_ar, price, in_stock').in('id', allWrapIds)
+            allGreeneryIds.length
+                ? supabase.from('greenery_options').select('id, name, name_ar, price, in_stock').in('id', allGreeneryIds)
                 : Promise.resolve({ data: [], error: null }),
-            allVaseIds.length
-                ? supabase.from('vase_options').select('id, name, name_ar, price, in_stock').in('id', allVaseIds)
+            allContainerIds.length
+                ? supabase.from('vase_options').select('id, name, name_ar, price, in_stock').in('id', allContainerIds)
+                : Promise.resolve({ data: [], error: null }),
+            allSizeKeys.length
+                ? supabase.from('bouquet_sizes').select('key, label_ar, price_multiplier').in('key', allSizeKeys)
                 : Promise.resolve({ data: [], error: null }),
         ])
 
-        if (flowersRes.error || wrapsRes.error || vasesRes.error) {
-            console.error('[orders/create] Bouquet ingredients fetch error:', flowersRes.error, wrapsRes.error, vasesRes.error)
+        if (flowersRes.error || greeneryRes.error || containersRes.error || sizesRes.error) {
+            console.error(
+                '[orders/create] Bouquet ingredients fetch error:',
+                flowersRes.error, greeneryRes.error, containersRes.error, sizesRes.error
+            )
             return NextResponse.json({ error: 'Failed to verify bouquet ingredients' }, { status: 500 })
         }
 
         flowerMap = new Map((flowersRes.data as FlowerRow[]).map((f) => [f.id, f]))
-        wrapMap = new Map((wrapsRes.data as WrapRow[]).map((w) => [w.id, w]))
-        vaseMap = new Map((vasesRes.data as VaseRow[]).map((v) => [v.id, v]))
+        greeneryMap = new Map((greeneryRes.data as GreeneryRow[]).map((g) => [g.id, g]))
+        containerMap = new Map((containersRes.data as ContainerRow[]).map((c) => [c.id, c]))
+        sizeMap = new Map((sizesRes.data as SizeRow[]).map((s) => [s.key, s]))
 
-        // تحقق وجود وتوفر كل عنصر مُختار
         for (const item of customItems) {
             for (const f of item.bouquet_selection!.flowers) {
                 const flower = flowerMap.get(f.id)
@@ -175,38 +191,44 @@ export async function POST(request: NextRequest) {
                     return NextResponse.json({ error: `Flower "${flower.name}" is out of stock` }, { status: 400 })
                 }
             }
-            const wrapId = item.bouquet_selection!.wrapId
-            if (wrapId) {
-                const wrap = wrapMap.get(wrapId)
-                if (!wrap) {
-                    return NextResponse.json({ error: `Wrap ${wrapId} not found` }, { status: 400 })
+            for (const g of item.bouquet_selection!.greenery || []) {
+                const greenery = greeneryMap.get(g.id)
+                if (!greenery) {
+                    return NextResponse.json({ error: `Greenery ${g.id} not found` }, { status: 400 })
                 }
-                if (!wrap.in_stock) {
-                    return NextResponse.json({ error: `Wrap "${wrap.name}" is out of stock` }, { status: 400 })
+                if (!greenery.in_stock) {
+                    return NextResponse.json({ error: `Greenery "${greenery.name}" is out of stock` }, { status: 400 })
                 }
             }
-            const vaseId = item.bouquet_selection!.vaseId
-            if (vaseId) {
-                const vase = vaseMap.get(vaseId)
-                if (!vase) {
-                    return NextResponse.json({ error: `Vase ${vaseId} not found` }, { status: 400 })
+            const containerId = item.bouquet_selection!.vaseId
+            if (containerId) {
+                const container = containerMap.get(containerId)
+                if (!container) {
+                    return NextResponse.json({ error: `Container ${containerId} not found` }, { status: 400 })
                 }
-                if (!vase.in_stock) {
-                    return NextResponse.json({ error: `Vase "${vase.name}" is out of stock` }, { status: 400 })
+                if (!container.in_stock) {
+                    return NextResponse.json({ error: `Container "${container.name}" is out of stock` }, { status: 400 })
                 }
+            }
+            const sizeKey = item.bouquet_selection!.sizeKey
+            if (sizeKey && !sizeMap.has(sizeKey)) {
+                return NextResponse.json({ error: `Bouquet size "${sizeKey}" not found` }, { status: 400 })
             }
         }
     }
 
-    // احتساب سعر الباقة المخصصة الواحدة بالكامل من بيانات السيرفر
     function computeCustomBouquetPrice(selection: NonNullable<typeof customItems[number]['bouquet_selection']>) {
         const flowersPrice = selection.flowers.reduce((sum, f) => {
             const flower = flowerMap.get(f.id)!
             return sum + flower.price * f.qty
         }, 0)
-        const wrapPrice = selection.wrapId ? (wrapMap.get(selection.wrapId)?.price || 0) : 0
-        const vasePrice = selection.vaseId ? (vaseMap.get(selection.vaseId)?.price || 0) : 0
-        return flowersPrice + wrapPrice + vasePrice
+        const greeneryPrice = (selection.greenery || []).reduce((sum, g) => {
+            const item = greeneryMap.get(g.id)!
+            return sum + item.price * g.qty
+        }, 0)
+        const containerPrice = selection.vaseId ? (containerMap.get(selection.vaseId)?.price || 0) : 0
+        const multiplier = selection.sizeKey ? (sizeMap.get(selection.sizeKey)?.price_multiplier || 1) : 1
+        return (flowersPrice + greeneryPrice + containerPrice) * multiplier
     }
 
     function buildCustomBouquetDisplay(selection: NonNullable<typeof customItems[number]['bouquet_selection']>) {
@@ -214,11 +236,21 @@ export async function POST(request: NextRequest) {
             const flower = flowerMap.get(f.id)!
             return `${flower.name_ar || flower.name} ×${f.qty}`
         }).join('، ')
-        const wrap = selection.wrapId ? wrapMap.get(selection.wrapId) : null
-        const vase = selection.vaseId ? vaseMap.get(selection.vaseId) : null
+        const greeneryNames = (selection.greenery || []).map((g) => {
+            const item = greeneryMap.get(g.id)!
+            return `${item.name_ar || item.name} ×${g.qty}`
+        }).join('، ')
+        const container = selection.vaseId ? containerMap.get(selection.vaseId) : null
+        const size = selection.sizeKey ? sizeMap.get(selection.sizeKey) : null
         const name = `باقة مخصصة — ${flowerNames}`
         const image = flowerMap.get(selection.flowers[0].id)?.image || ''
-        return { name, image, wrapName: wrap?.name_ar || wrap?.name || '', vaseName: vase?.name_ar || vase?.name || '' }
+        return {
+            name,
+            image,
+            containerName: container?.name_ar || container?.name || '',
+            greeneryNames,
+            sizeLabel: size?.label_ar || '',
+        }
     }
 
     const total =
@@ -257,8 +289,8 @@ export async function POST(request: NextRequest) {
                         const flower = flowerMap.get(f.id)!
                         return `${flower.name_ar || flower.name} ×${f.qty}`
                     }),
-                    wrap: display.wrapName,
-                    vase: display.vaseName,
+                    wrap: display.greeneryNames,
+                    vase: `${display.containerName}${display.sizeLabel ? ` — ${display.sizeLabel}` : ''}`,
                     message: item.customization?.message || '',
                 },
             }

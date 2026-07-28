@@ -29,8 +29,10 @@ export interface CartItem {
   };
   bouquetSelection?: {
     flowers: { id: string; qty: number }[];
+    greenery?: { id: string; qty: number }[];
     wrapId: string | null;
     vaseId: string | null;
+    sizeKey?: string;
   };
 }
 

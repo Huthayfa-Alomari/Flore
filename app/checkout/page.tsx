@@ -84,7 +84,7 @@ export default function CheckoutPage() {
             product_id: item.product.id,
             qty: item.quantity,
             customization: item.customization || null,
-            ...(item.bouquetSelection && { bouquet_selection: item.bouquetSelection }),
+            bouquet_selection: item.bouquetSelection || null,
           })),
           customer_name: form.name,
           customer_phone: form.phone,
@@ -116,8 +116,6 @@ export default function CheckoutPage() {
         router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
 
       } else if (form.payment === 'cliq') {
-        // الدفع عبر CliQ يتم يدوياً حالياً (لا يوجد تكامل API مباشر مع CliQ للتجار الأفراد)
-        // نوجّه العميل للتحويل على الـ alias، ثم نفتح واتساب لإرسال إثبات التحويل وتأكيد الطلب
         const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '962790000000'
         const cliqMessage = `مرحباً، حوّلت مبلغ ${formatPrice(orderTotal)} عبر CliQ لطلب رقم #${orderId.slice(0, 8)}\nمرفق لقطة الشاشة للتأكيد 🌸`
         const cliqWhatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(cliqMessage)}`
