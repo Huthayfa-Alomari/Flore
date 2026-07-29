@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
 import { MapPin, Thermometer, Droplets, Clock, Truck, Package, CheckCircle, ChevronLeft, Loader2 } from 'lucide-react'
 import { useRealtimeOrder } from '@/hooks/useRealtimeOrder'
@@ -12,18 +12,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { orderStatuses } from '@/lib/utils'
 
+// استيراد مكوّن الخريطة التفاعلية ديناميكياً لتفادي مشاكل SSR مع Leaflet
+const LiveMap = dynamic(
+  () => import('@/components/tracking/LiveMap').then((m) => m.LiveMap),
+  {
+    ssr: false,
+    loading: () => <div className="aspect-square bg-flore-subtle animate-pulse" />,
+  }
+)
+
 export default function TrackingPage() {
   const params = useParams()
-  const orderId = params.orderId as string
+  const orderId = (params?.orderId || params?.id) as string
   const { order, loading } = useRealtimeOrder(orderId)
-  const [mapUrl, setMapUrl] = useState('')
-
-  useEffect(() => {
-    if (order?.driver_lat && order?.driver_lng) {
-      const url = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1000!2d${order.driver_lng}!3d${order.driver_lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzHCsDU3JzIwLjAiTiAzNcKwNTcnMjAuMCJF!5e0!3m2!1sen!2sjo!4v1`
-      setMapUrl(url)
-    }
-  }, [order?.driver_lat, order?.driver_lng])
 
   if (loading) {
     return (
@@ -47,12 +48,15 @@ export default function TrackingPage() {
     )
   }
 
-  const currentStatusIndex = orderStatuses.findIndex(s => s.value === order.status)
-  const statusInfo = orderStatuses.find(s => s.value === order.status)
+  const currentStatusIndex = orderStatuses.findIndex((s) => s.value === order.status)
+  const statusInfo = orderStatuses.find((s) => s.value === order.status)
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <Link href="/profile" className="inline-flex items-center gap-2 text-flore-text-secondary hover:text-flore-primary mb-8 transition-colors">
+      <Link
+        href="/profile"
+        className="inline-flex items-center gap-2 text-flore-text-secondary hover:text-flore-primary mb-8 transition-colors"
+      >
         <ChevronLeft className="h-4 w-4" />
         <span className="font-noto text-sm">العودة للحساب</span>
       </Link>
@@ -96,11 +100,10 @@ export default function TrackingPage() {
                     >
                       <div className="flex flex-col items-center">
                         <div
-                          className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                            isCompleted
+                          className={`h-10 w-10 rounded-full flex items-center justify-center ${isCompleted
                               ? 'bg-flore-primary text-white'
                               : 'bg-flore-subtle text-flore-text-secondary'
-                          } ${isCurrent ? 'ring-4 ring-flore-primary/20' : ''}`}
+                            } ${isCurrent ? 'ring-4 ring-flore-primary/20' : ''}`}
                         >
                           {isCompleted ? (
                             <CheckCircle className="h-5 w-5" />
@@ -110,19 +113,17 @@ export default function TrackingPage() {
                         </div>
                         {i < orderStatuses.length - 2 && (
                           <div
-                            className={`w-0.5 flex-1 mt-2 ${
-                              isCompleted && i < currentStatusIndex
+                            className={`w-0.5 flex-1 mt-2 ${isCompleted && i < currentStatusIndex
                                 ? 'bg-flore-primary'
                                 : 'bg-flore-border'
-                            }`}
+                              }`}
                           />
                         )}
                       </div>
                       <div className="pt-1">
                         <p
-                          className={`font-medium ${
-                            isCurrent ? 'text-flore-primary' : 'text-flore-text-primary'
-                          }`}
+                          className={`font-medium ${isCurrent ? 'text-flore-primary' : 'text-flore-text-primary'
+                            }`}
                         >
                           {status.label}
                         </p>
@@ -202,17 +203,9 @@ export default function TrackingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              {mapUrl ? (
+              {order.driver_lat && order.driver_lng ? (
                 <div className="aspect-square bg-flore-subtle">
-                  <iframe
-                    src={mapUrl}
-                    width="100%"
-                    height="100%"
-                    style={{ border: 0 }}
-                    allowFullScreen
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
+                  <LiveMap lat={order.driver_lat} lng={order.driver_lng} />
                 </div>
               ) : (
                 <div className="aspect-square bg-flore-subtle flex items-center justify-center">

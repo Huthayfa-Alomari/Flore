@@ -1,26 +1,32 @@
 'use client'
 
-interface LiveMapProps {
-  lat: number
-  lng: number
-  className?: string
-}
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
-export function LiveMap({ lat, lng, className = '' }: LiveMapProps) {
-  const mapUrl = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1000!2d${lng}!3d${lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzFCsDU3JzIwLjAiTiAzNcKwNTcnMjAuMCJF!5e0!3m2!1sen!2sjo!4v1`
+// أيقونة افتراضية مخصصة (Leaflet بحاجة هذا التعديل مع Next.js)
+const driverIcon = new L.Icon({
+  iconUrl: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+})
 
+export function LiveMap({ lat, lng }: { lat: number; lng: number }) {
   return (
-    <div className={`relative overflow-hidden rounded-2xl ${className}`}>
-      <iframe
-        src={mapUrl}
-        width="100%"
-        height="100%"
-        style={{ border: 0, minHeight: '400px' }}
-        allowFullScreen
-        loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
-        className="absolute inset-0"
+    <MapContainer
+      center={[lat, lng]}
+      zoom={14}
+      style={{ width: '100%', height: '100%' }}
+      scrollWheelZoom={false}
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-    </div>
+      <Marker position={[lat, lng]} icon={driverIcon}>
+        <Popup>موقع السائق الحالي 🚗</Popup>
+      </Marker>
+    </MapContainer>
   )
 }
