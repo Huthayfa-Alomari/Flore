@@ -80,7 +80,7 @@ const COLOR_FILTERS = [
 
 function triggerConfetti() {
   if (typeof window === 'undefined') return
-  const colors = ['#A8813C', '#C9A962', '#3F5D45', '#ff6b9d']
+  const colors = ['#0D5C63', '#67B26F', '#C9A962', '#ff6b9d']
   for (let i = 0; i < 40; i++) {
     const el = document.createElement('div')
     el.style.position = 'fixed'
@@ -289,7 +289,7 @@ export default function AtelierPage() {
       description: `زهور: ${selectedFlowerNames}${selectedContainerObj ? ` | حاوية: ${selectedContainerObj.name_ar || selectedContainerObj.name}` : ''}${size ? ` | الحجم: ${size.label_ar}` : ''}`,
       description_en: null,
       badge: 'مخصص',
-      badge_color: '#A8813C',
+      badge_color: '#0D5C63',
       in_stock: true,
       model_url: null,
       ar_enabled: false,

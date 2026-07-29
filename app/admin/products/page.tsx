@@ -31,7 +31,7 @@ const emptyForm: ProductForm = {
   description: '',
   description_en: '',
   badge: '',
-  badge_color: '#A8813C',
+  badge_color: '#0D5C63',
   in_stock: true,
   ar_enabled: false,
 }
@@ -96,7 +96,7 @@ export default function AdminProductsPage() {
       description: product.description || '',
       description_en: product.description_en || '',
       badge: product.badge || '',
-      badge_color: product.badge_color || '#A8813C',
+      badge_color: product.badge_color || '#0D5C63',
       in_stock: product.in_stock,
       ar_enabled: product.ar_enabled,
     })
@@ -521,7 +521,7 @@ export default function AdminProductsPage() {
                 />
                 {product.badge && (
                   <div className="absolute top-3 right-3">
-                    <Badge style={{ backgroundColor: product.badge_color || '#A8813C' }} className="text-white">
+                    <Badge style={{ backgroundColor: product.badge_color || '#0D5C63' }} className="text-white">
                       {product.badge}
                     </Badge>
                   </div>

@@ -3,33 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --flore-primary: #A8813C;
-  --flore-primary-dark: #8A6830;
+  --flore-primary: #0D5C63;
+  --flore-primary-dark: #084549;
   --flore-gold: #E7D8B9;
   --flore-gold-dark: #C9A962;
-  --flore-bg: #FBF7F1;
+  --flore-bg: #FAF9F6;
   --flore-card: #FFFFFF;
-  --flore-subtle: #F5EDE0;
-  --flore-text-primary: #2B2018;
-  --flore-text-secondary: #8A7E72;
-  --flore-border: #EDE6D8;
-  --flore-shadow: 0 4px 24px rgba(168, 129, 60, 0.10);
-  --flore-success: #5E9E65;
-  --flore-error: #D45B5B;
-  --flore-warning: #D4922A;
-  --flore-accent-botanical: #3F5D45;
+  --flore-subtle: #F5E6E8;
+  --flore-text-primary: #0D5C63;
+  --flore-text-secondary: #6E7B7D;
+  --flore-border: #E8E8E8;
+  --flore-shadow: 0 4px 24px rgba(13, 92, 99, 0.08);
+  --flore-success: #67B26F;
+  --flore-error: #FF6B6B;
+  --flore-warning: #F5A623;
 }
 
 [data-theme="dark"] {
-  --flore-primary: #C9A05A;
-  --flore-primary-dark: #A8813C;
-  --flore-bg: #1A1714;
-  --flore-card: #242018;
-  --flore-subtle: #2E2820;
-  --flore-text-primary: #F3EEE4;
-  --flore-text-secondary: #B3A794;
-  --flore-border: #3A342A;
-  --flore-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  --flore-bg: #1A1F1E;
+  --flore-card: #252B2A;
+  --flore-text-primary: #E8F4F3;
+  --flore-text-secondary: #A0B3B0;
+  --flore-border: #3A4543;
+  --flore-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
 @layer base {
