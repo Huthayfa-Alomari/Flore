@@ -8,6 +8,7 @@ import { useCart } from '@/lib/store/cart-store'
 import { Button } from '@/components/ui/Button'
 import { formatPrice, generateWhatsAppMessage } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { GiftMediaRecorder } from '@/components/checkout/GiftMediaRecorder'
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -24,6 +25,8 @@ export default function CheckoutPage() {
     giftMessage: '',
     notes: '',
   })
+
+  const [giftMedia, setGiftMedia] = useState<{ blob: Blob; type: 'audio' | 'video' } | null>(null)
 
   const supabase = createClient()
 
@@ -70,6 +73,27 @@ export default function CheckoutPage() {
 
   if (items.length === 0) return null
 
+  const uploadGiftMedia = async (orderId: string) => {
+    if (!giftMedia) return
+
+    const formData = new FormData()
+    formData.append('media', giftMedia.blob, giftMedia.type === 'video' ? 'gift.webm' : 'gift-audio.webm')
+    formData.append('customerPhone', form.phone)
+
+    try {
+      const res = await fetch(`/api/orders/${orderId}/gift-media`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        console.error('Gift media upload failed:', await res.text())
+        // ما نوقف عملية الطلب — رفع الرسالة فشل بس الطلب نفسه نجح، نكمل عادي
+      }
+    } catch (err) {
+      console.error('Gift media upload error:', err)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (loading) return
@@ -84,7 +108,7 @@ export default function CheckoutPage() {
             product_id: item.product.id,
             qty: item.quantity,
             customization: item.customization || null,
-            bouquet_selection: item.bouquetSelection || null,
+            ...(item.bouquetSelection && { bouquet_selection: item.bouquetSelection }),
           })),
           customer_name: form.name,
           customer_phone: form.phone,
@@ -106,6 +130,9 @@ export default function CheckoutPage() {
 
       const { orderId, total: serverTotal } = await response.json()
       const orderTotal = serverTotal || getTotal()
+
+      // ارفع رسالة الإهداء (صوت/فيديو) فور نجاح إنشاء الطلب، قبل أي خطوة دفع
+      await uploadGiftMedia(orderId)
 
       if (form.payment === 'whatsapp') {
         const message = generateWhatsAppMessage(items, orderTotal)
@@ -273,9 +300,14 @@ export default function CheckoutPage() {
             <textarea
               value={form.giftMessage}
               onChange={e => setForm(prev => ({ ...prev, giftMessage: e.target.value }))}
-              className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none resize-none transition-colors"
+              className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none resize-none transition-colors mb-4"
               rows={2} placeholder="اكتب كلمات الإهداء التي ترغب في إرفاقها مع الباقة..."
             />
+
+            <p className="text-sm text-flore-text-secondary mb-2">
+              🎙️ أضف رسالة صوتية أو فيديو قصير — سيصل المُستقبل رمز QR على البطاقة يستمع فيه لصوتك
+            </p>
+            <GiftMediaRecorder onRecorded={(blob, type) => setGiftMedia({ blob, type })} />
           </section>
 
           {/* ملاحظات */}
