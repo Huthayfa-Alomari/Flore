@@ -72,6 +72,9 @@ export interface Order {
   temperature: number | null;
   humidity: number | null;
   estimated_arrival: string | null;
+  gift_token: string | null;
+  gift_media_url: string | null;
+  gift_media_type: 'audio' | 'video' | null;
   created_at: string;
   updated_at: string;
 }

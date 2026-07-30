@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { orderStatuses } from '@/lib/utils'
+import { GiftQRCode } from '@/components/gift/GiftQRCode'
 
 // استيراد مكوّن الخريطة التفاعلية ديناميكياً لتفادي مشاكل SSR مع Leaflet
 const LiveMap = dynamic(
@@ -25,6 +27,13 @@ export default function TrackingPage() {
   const params = useParams()
   const orderId = (params?.orderId || params?.id) as string
   const { order, loading } = useRealtimeOrder(orderId)
+  const [origin, setOrigin] = useState('')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin)
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -78,7 +87,7 @@ export default function TrackingPage() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
-        {/* Status Timeline */}
+        {/* Status Timeline & Details */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -167,6 +176,18 @@ export default function TrackingPage() {
             </CardContent>
           </Card>
 
+          {/* Gift QR Code Card */}
+          {order.gift_media_url && order.gift_token && origin && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-amiri text-xl">رمز الهدية (QR Code)</CardTitle>
+              </CardHeader>
+              <CardContent className="flex justify-center py-4">
+                <GiftQRCode giftUrl={`${origin}/gift/${order.gift_token}`} />
+              </CardContent>
+            </Card>
+          )}
+
           {/* Sensor Data */}
           {(order.temperature || order.humidity) && (
             <Card>
@@ -193,7 +214,7 @@ export default function TrackingPage() {
           )}
         </div>
 
-        {/* Map */}
+        {/* Map & Items */}
         <div className="space-y-6">
           <Card className="overflow-hidden">
             <CardHeader>
