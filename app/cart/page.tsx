@@ -9,10 +9,11 @@ import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react'
 import { useCart } from '@/lib/store/cart-store'
 import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/lib/utils'
+import { FlowerAddButton } from '@/components/ui/FlowerAddButton'
 
 export default function CartPage() {
   const router = useRouter()
-  const { items, removeItem, updateQuantity, getTotal, clearCart } = useCart()
+  const { items, removeItem, updateQuantity, getTotal } = useCart()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -94,14 +95,10 @@ export default function CartPage() {
               <span className="text-flore-text-secondary">المجموع</span>
               <span className="font-amiri text-2xl font-bold text-flore-primary">{formatPrice(getTotal())}</span>
             </div>
-            <div className="flex gap-3">
-              <button onClick={clearCart} className="flex-1 py-3 rounded-xl border-2 border-red-200 text-red-500 hover:bg-red-50 transition-colors font-medium">
-                إفراغ السلة
-              </button>
-              <Button size="lg" className="flex-[2] gap-2" onClick={() => router.push('/checkout')}>
-                إتمـام الطلب
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
+            <div className="flex-[2]">
+              <FlowerAddButton variant="botanical" onClick={() => router.push('/checkout')}>
+                إتمام الطلب ←
+              </FlowerAddButton>
             </div>
           </div>
         </motion.div>

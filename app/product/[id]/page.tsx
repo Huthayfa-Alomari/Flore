@@ -5,11 +5,12 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, ShoppingBag, Eye, ArrowLeft, Check, Copy, MessageCircle } from 'lucide-react'
+import { Heart, Eye, ArrowLeft, Check, Copy, MessageCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 // التعديل 1: استيراد useCart بدلاً من useCartStore
 import { useCart } from '@/lib/store/cart-store'
 import { Button } from '@/components/ui/Button'
+import { FlowerAddButton } from '@/components/ui/FlowerAddButton'
 import { Badge } from '@/components/ui/Badge'
 import { ARFlowerViewer } from '@/components/catalog/ARFlowerViewer'
 import type { Product } from '@/types'
@@ -203,15 +204,12 @@ export default function ProductDetailPage() {
 
           {/* Actions */}
           <div className="flex flex-col gap-3">
-            <Button
-              size="lg"
-              className="w-full gap-2"
-              // التعديل 3: تمرير المنتج والكمية معاً في كائن واحد ليوافق الـ Interface الجديد
+            <FlowerAddButton
+              variant="primary"
               onClick={() => addItem({ product, quantity })}
             >
-              <ShoppingBag className="h-5 w-5" />
               أضف للسلة - {product.price * quantity} د.أ
-            </Button>
+            </FlowerAddButton>
 
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1 gap-2">
