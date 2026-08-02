@@ -10,11 +10,13 @@ export function ThemeSwitch() {
 
     useEffect(() => setMounted(true), [])
 
+    const sizeStyle = { '--toggle-size': '13px' } as React.CSSProperties
+
     if (!mounted) {
         return (
             <div
                 className={styles['theme-switch']}
-                style={{ width: '5.625em', height: '2.5em', fontSize: '10px' }}
+                style={{ ...sizeStyle, width: '5.625em', height: '2.5em' }}
             />
         )
     }
@@ -22,7 +24,7 @@ export function ThemeSwitch() {
     const isDark = resolvedTheme === 'dark'
 
     return (
-        <label className={styles['theme-switch']} style={{ fontSize: '10px' }}>
+        <label className={styles['theme-switch']} style={sizeStyle}>
             <input
                 type="checkbox"
                 className={styles['theme-switch__checkbox']}
