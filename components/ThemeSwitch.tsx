@@ -11,14 +11,18 @@ export function ThemeSwitch() {
     useEffect(() => setMounted(true), [])
 
     if (!mounted) {
-        // تجنب أي فرق بين السيرفر والعميل لحد ما نعرف الثيم الفعلي
-        return <div className={styles['theme-switch']} style={{ width: '5.625em', height: '2.5em' }} />
+        return (
+            <div
+                className={styles['theme-switch']}
+                style={{ width: '5.625em', height: '2.5em', fontSize: '10px' }}
+            />
+        )
     }
 
     const isDark = resolvedTheme === 'dark'
 
     return (
-        <label className={styles['theme-switch']}>
+        <label className={styles['theme-switch']} style={{ fontSize: '10px' }}>
             <input
                 type="checkbox"
                 className={styles['theme-switch__checkbox']}
