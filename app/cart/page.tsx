@@ -9,7 +9,6 @@ import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react'
 import { useCart } from '@/lib/store/cart-store'
 import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/lib/utils'
-import { FlowerAddButton } from '@/components/ui/FlowerAddButton'
 
 export default function CartPage() {
   const router = useRouter()
@@ -23,7 +22,9 @@ export default function CartPage() {
   if (!mounted) {
     return (
       <div className="min-h-screen bg-flore-bg flex items-center justify-center">
-        <div className="animate-pulse font-amiri text-xl text-flore-primary">جاري تحميل السلة الفاخرة...</div>
+        <div className="animate-pulse font-amiri text-xl text-flore-primary">
+          جاري تحميل السلة الفاخرة...
+        </div>
       </div>
     )
   }
@@ -33,8 +34,12 @@ export default function CartPage() {
       <div className="min-h-screen flex items-center justify-center bg-flore-bg px-4">
         <div className="text-center">
           <ShoppingBag className="h-20 w-20 mx-auto text-flore-primary/30 mb-6" />
-          <h1 className="font-amiri text-3xl font-bold text-flore-text-primary mb-4">السلة فارغة</h1>
-          <p className="text-flore-text-secondary mb-8">اكتشف مجموعتنا الفاخرة واختر ما يناسبك</p>
+          <h1 className="font-amiri text-3xl font-bold text-flore-text-primary mb-4">
+            السلة فارغة
+          </h1>
+          <p className="text-flore-text-secondary mb-8">
+            اكتشف مجموعتنا الفاخرة واختر ما يناسبك
+          </p>
           <Link href="/catalog">
             <Button size="lg" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
@@ -59,31 +64,56 @@ export default function CartPage() {
 
           <div className="space-y-4">
             {items.map((item) => (
-              <div key={item.product.id} className="bg-flore-card rounded-2xl p-4 shadow-luxury flex gap-4">
+              <div
+                key={item.product.id}
+                className="bg-flore-card rounded-2xl p-4 shadow-luxury flex gap-4"
+              >
                 <div className="relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
-                  <Image src={item.product.image || '/placeholder.png'} alt={item.product.name} fill className="object-cover" />
+                  <Image
+                    src={item.product.image || '/placeholder.png'}
+                    alt={item.product.name}
+                    fill
+                    className="object-cover"
+                  />
                 </div>
                 <div className="flex-1 text-right">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-amiri text-lg font-bold text-flore-text-primary">{item.product.name}</h3>
-                      <p className="text-flore-text-secondary text-sm">{formatPrice(item.product.price)} / وحدة</p>
+                      <h3 className="font-amiri text-lg font-bold text-flore-text-primary">
+                        {item.product.name}
+                      </h3>
+                      <p className="text-flore-text-secondary text-sm">
+                        {formatPrice(item.product.price)} / وحدة
+                      </p>
                     </div>
-                    <button onClick={() => removeItem(item.product.id)} className="text-red-400 hover:text-red-600 transition-colors">
+                    <button
+                      onClick={() => removeItem(item.product.id)}
+                      className="text-red-400 hover:text-red-600 transition-colors"
+                    >
                       <Trash2 className="h-5 w-5" />
                     </button>
                   </div>
                   <div className="flex items-center justify-between mt-4">
                     <div className="flex items-center gap-2 bg-flore-subtle rounded-xl">
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="p-2 hover:bg-flore-gold/20 rounded-xl transition-colors">
+                      <button
+                        onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                        className="p-2 hover:bg-flore-gold/20 rounded-xl transition-colors"
+                      >
                         <Minus className="h-4 w-4" />
                       </button>
-                      <span className="w-8 text-center font-bold">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="p-2 hover:bg-flore-gold/20 rounded-xl transition-colors">
+                      <span className="w-8 text-center font-bold">
+                        {item.quantity}
+                      </span>
+                      <button
+                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        className="p-2 hover:bg-flore-gold/20 rounded-xl transition-colors"
+                      >
                         <Plus className="h-4 w-4" />
                       </button>
                     </div>
-                    <p className="font-amiri text-xl font-bold text-flore-primary">{formatPrice(item.product.price * item.quantity)}</p>
+                    <p className="font-amiri text-xl font-bold text-flore-primary">
+                      {formatPrice(item.product.price * item.quantity)}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -91,15 +121,20 @@ export default function CartPage() {
           </div>
 
           <div className="mt-8 bg-flore-card rounded-3xl p-6 shadow-luxury">
-            <div className="flex justify-between items-center mb-4 text-right">
+            <div className="flex justify-between items-center mb-6 text-right">
               <span className="text-flore-text-secondary">المجموع</span>
-              <span className="font-amiri text-2xl font-bold text-flore-primary">{formatPrice(getTotal())}</span>
+              <span className="font-amiri text-2xl font-bold text-flore-primary">
+                {formatPrice(getTotal())}
+              </span>
             </div>
-            <div className="flex-[2]">
-              <FlowerAddButton variant="botanical" onClick={() => router.push('/checkout')}>
-                إتمام الطلب ←
-              </FlowerAddButton>
-            </div>
+            <Button
+              size="lg"
+              className="w-full gap-2 justify-center"
+              onClick={() => router.push('/checkout')}
+            >
+              إتمام الطلب
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
           </div>
         </motion.div>
       </div>

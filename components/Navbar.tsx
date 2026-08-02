@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ShoppingCart, User, Flower2 } from 'lucide-react'
 import { useCart } from '@/lib/store/cart-store'
-import { ThemeToggle } from '@/components/ThemeToggle'
+import { ThemeSwitch } from '@/components/ThemeSwitch'
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -55,7 +55,7 @@ export function Navbar() {
           <div className="flex items-center gap-2">
 
             {/* زر تبديل الوضع الداكن/الفاتح */}
-            <ThemeToggle />
+            <ThemeSwitch />
 
             {/* سلة المشتريات */}
             <Link href="/cart" className="relative p-2 rounded-full hover:bg-flore-card transition-colors group">
