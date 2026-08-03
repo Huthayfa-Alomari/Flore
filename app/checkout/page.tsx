@@ -156,6 +156,25 @@ export default function CheckoutPage() {
         alert('تم تسجيل طلبك بنجاح 🌸. سيتم الدفع نقداً عند استلام الباقة الفاخرة.')
         clearCart()
         router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
+      } else if (form.payment === 'card') {
+        const ptRes = await fetch('/api/payment/paytabs/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        })
+        const ptData = await ptRes.json()
+
+        if (!ptRes.ok) {
+          const message = typeof ptData.error === 'string' ? ptData.error : 'فشل بدء عملية الدفع'
+          throw new Error(message)
+        }
+
+        clearCart()
+        if (ptData.redirectUrl) {
+          window.location.href = ptData.redirectUrl // توجيه فوري لصفحة PayTabs الآمنة
+        } else {
+          router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
+        }
       }
 
     } catch (err: unknown) {
@@ -168,6 +187,7 @@ export default function CheckoutPage() {
   }
 
   const paymentMethods = [
+    { id: 'card', label: 'بطاقة ائتمانية', icon: CreditCard, desc: 'Visa / Mastercard عبر PayTabs' },
     { id: 'whatsapp', label: 'واتساب', icon: MessageCircle, desc: 'تأكيد فوري وفاتورة مباشرة' },
     { id: 'cliq', label: 'تطبيق CliQ', icon: Banknote, desc: 'تحويل يدوي عبر الـ Alias' },
     { id: 'cash', label: 'كاش عند الاستلام', icon: Banknote, desc: 'الدفع نقداً لسائق فلوري' },
