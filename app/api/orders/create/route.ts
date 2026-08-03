@@ -42,7 +42,7 @@ const CreateOrderSchema = z.object({
     delivery_notes: z.string().max(500).optional().nullable(),
     delivery_date: z.string().datetime().optional(),
     gift_message: z.string().max(500).optional().nullable(),
-    payment_method: z.enum(['whatsapp', 'cliq', 'cash', 'stripe']),
+    payment_method: z.enum(['whatsapp', 'cliq', 'cash', 'card']),
 })
 
 function isCustomItem(productId: string) {
