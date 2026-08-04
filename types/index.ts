@@ -63,9 +63,14 @@ export interface Order {
   delivery_address: string;
   delivery_region: string | null;
   delivery_notes: string | null;
+  delivery_time_slot: string | null;
   customer_phone: string;
   customer_name: string | null;
   gift_message: string | null;
+  is_anonymous_gift: boolean;
+  awaiting_recipient_address: boolean;
+  recipient_name: string | null;
+  recipient_address_token: string | null;
   driver_id: string | null;
   driver_lat: number | null;
   driver_lng: number | null;

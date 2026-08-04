@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { MapPin, User, MessageSquare, CreditCard, Banknote, MessageCircle, ArrowLeft } from 'lucide-react'
+import { MapPin, User, MessageSquare, CreditCard, Banknote, MessageCircle, ArrowLeft, Clock } from 'lucide-react'
 import { useCart } from '@/lib/store/cart-store'
 import { Button } from '@/components/ui/Button'
 import { formatPrice, generateWhatsAppMessage } from '@/lib/utils'
@@ -24,6 +24,11 @@ export default function CheckoutPage() {
     payment: 'whatsapp',
     giftMessage: '',
     notes: '',
+    deliveryTimeSlot: '',
+    isAnonymousGift: false,
+    askRecipientAddress: false,
+    recipientName: '',
+    recipientPhone: '',
   })
 
   const [giftMedia, setGiftMedia] = useState<{ blob: Blob; type: 'audio' | 'video' } | null>(null)
@@ -112,11 +117,14 @@ export default function CheckoutPage() {
           })),
           customer_name: form.name,
           customer_phone: form.phone,
-          delivery_address: form.address,
-          delivery_region: form.region.toLowerCase(),
+          ...(form.askRecipientAddress
+            ? { awaiting_recipient_address: true, recipient_name: form.recipientName, recipient_phone: form.recipientPhone }
+            : { delivery_address: form.address, delivery_region: form.region.toLowerCase() }),
           gift_message: form.giftMessage || null,
           delivery_notes: form.notes || null,
           payment_method: form.payment.toLowerCase(),
+          delivery_time_slot: form.deliveryTimeSlot || null,
+          is_anonymous_gift: form.isAnonymousGift,
         }),
       })
 
@@ -128,13 +136,20 @@ export default function CheckoutPage() {
         throw new Error(message)
       }
 
-      const { orderId, total: serverTotal } = await response.json()
+      const { orderId, total: serverTotal, recipientAddressToken } = await response.json()
       const orderTotal = serverTotal || getTotal()
 
       // ارفع رسالة الإهداء (صوت/فيديو) فور نجاح إنشاء الطلب، قبل أي خطوة دفع
       await uploadGiftMedia(orderId)
 
-      if (form.payment === 'whatsapp') {
+      if (form.askRecipientAddress) {
+        const link = `${window.location.origin}/recipient-address/${recipientAddressToken}`
+        const msg = `مرحباً ${form.recipientName}! 🌸 لديك هدية من Floré بانتظارك، الرجاء إدخال عنوانك من هنا: ${link}`
+        const waNumber = form.recipientPhone.replace(/^0/, '962')
+        window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank')
+        clearCart()
+        router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
+      } else if (form.payment === 'whatsapp') {
         const message = generateWhatsAppMessage(items, orderTotal)
         const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '962790000000'
         const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
@@ -245,30 +260,69 @@ export default function CheckoutPage() {
             <h2 className="font-amiri text-xl font-bold mb-4 flex items-center gap-2 text-flore-primary">
               <MapPin className="h-5 w-5" /> وجهة التوصيل
             </h2>
-            <div className="space-y-4">
+            <label className="flex items-center justify-between mb-4 cursor-pointer bg-flore-bg rounded-xl p-3">
               <div>
-                <label className="block text-sm text-flore-text-secondary mb-1">المنطقة</label>
-                <select
-                  value={form.region}
-                  onChange={e => setForm(prev => ({ ...prev, region: e.target.value }))}
-                  className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none transition-colors cursor-pointer"
-                >
-                  <option value="amman">عمّان</option>
-                  <option value="zarqa">الزرقاء</option>
-                  <option value="irbid">إربد</option>
-                  <option value="other">أخرى</option>
-                </select>
+                <p className="font-bold text-sm text-flore-text-primary">اطلب العنوان من المستلم</p>
+                <p className="text-xs text-flore-text-secondary mt-0.5">سنرسل للمستلم رابطاً لإدخال عنوانه بنفسه</p>
               </div>
-              <div>
-                <label className="block text-sm text-flore-text-secondary mb-1">العنوان بالتفصيل</label>
-                <textarea
-                  required value={form.address}
-                  onChange={e => setForm(prev => ({ ...prev, address: e.target.value }))}
-                  className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none resize-none transition-colors"
-                  rows={2} placeholder="الشارع، رقم البناء، المعالم القريبة"
-                />
+              <input
+                type="checkbox"
+                checked={form.askRecipientAddress}
+                onChange={e => setForm(prev => ({ ...prev, askRecipientAddress: e.target.checked }))}
+                className="w-5 h-5 rounded accent-flore-primary"
+              />
+            </label>
+
+            {form.askRecipientAddress ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-flore-text-secondary mb-1">اسم المستلم</label>
+                  <input
+                    required
+                    type="text"
+                    value={form.recipientName}
+                    onChange={e => setForm(prev => ({ ...prev, recipientName: e.target.value }))}
+                    className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-flore-text-secondary mb-1">رقم هاتف المستلم</label>
+                  <input
+                    required
+                    type="tel"
+                    value={form.recipientPhone}
+                    onChange={e => setForm(prev => ({ ...prev, recipientPhone: e.target.value }))}
+                    dir="ltr"
+                    className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none"
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-flore-text-secondary mb-1">المنطقة</label>
+                  <select
+                    value={form.region}
+                    onChange={e => setForm(prev => ({ ...prev, region: e.target.value }))}
+                    className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none transition-colors cursor-pointer"
+                  >
+                    <option value="amman">عمّان</option>
+                    <option value="zarqa">الزرقاء</option>
+                    <option value="irbid">إربد</option>
+                    <option value="other">أخرى</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-flore-text-secondary mb-1">العنوان بالتفصيل</label>
+                  <textarea
+                    required value={form.address}
+                    onChange={e => setForm(prev => ({ ...prev, address: e.target.value }))}
+                    className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none resize-none transition-colors"
+                    rows={2} placeholder="الشارع، رقم البناء، المعالم القريبة"
+                  />
+                </div>
+              </div>
+            )}
           </section>
 
           {/* طريقة الدفع */}
@@ -310,6 +364,50 @@ export default function CheckoutPage() {
                 </p>
               </div>
             )}
+          </section>
+
+          {/* وقت التوصيل */}
+          <section className="bg-flore-card rounded-3xl p-6 shadow-luxury border border-flore-border">
+            <h2 className="font-amiri text-xl font-bold mb-4 flex items-center gap-2 text-flore-primary">
+              <Clock className="h-5 w-5" /> وقت التوصيل المفضّل
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { value: '09:00-13:00', label: 'صباحاً', desc: '9:00 - 1:00' },
+                { value: '13:00-17:00', label: 'ظهراً', desc: '1:00 - 5:00' },
+                { value: '17:00-21:00', label: 'مساءً', desc: '5:00 - 9:00' },
+                { value: '', label: 'أي وقت', desc: 'حسب توفر السائق' },
+              ].map(slot => (
+                <button
+                  key={slot.value}
+                  type="button"
+                  onClick={() => setForm(prev => ({ ...prev, deliveryTimeSlot: slot.value }))}
+                  className={`p-3 rounded-xl border-2 text-center transition-all ${form.deliveryTimeSlot === slot.value
+                    ? 'border-flore-primary bg-flore-primary/5'
+                    : 'border-flore-border bg-flore-bg'
+                    }`}
+                >
+                  <p className="font-bold text-sm text-flore-text-primary">{slot.label}</p>
+                  <p className="text-xs text-flore-text-secondary">{slot.desc}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* هدية مجهولة المصدر */}
+          <section className="bg-flore-card rounded-3xl p-6 shadow-luxury border border-flore-border">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <p className="font-bold text-flore-text-primary">إخفاء هويتي عن المستلم</p>
+                <p className="text-xs text-flore-text-secondary mt-1">لن نشارك اسمك أو رقمك مع المستلم حتى لو سأل</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={form.isAnonymousGift}
+                onChange={e => setForm(prev => ({ ...prev, isAnonymousGift: e.target.checked }))}
+                className="w-5 h-5 rounded accent-flore-primary"
+              />
+            </label>
           </section>
 
           {/* رسالة الإهداء */}

@@ -37,11 +37,16 @@ const CreateOrderSchema = z.object({
     customer_name: z.string().min(1).max(100),
     customer_phone: z.string().min(10).max(20),
     customer_email: z.string().email().optional(),
-    delivery_address: z.string().min(5).max(500),
+    delivery_address: z.string().min(5).max(500).optional(),
+    awaiting_recipient_address: z.boolean().optional(),
+    recipient_name: z.string().max(100).optional(),
+    recipient_phone: z.string().min(10).max(20).optional(),
     delivery_region: z.string().max(100).optional().nullable(),
     delivery_notes: z.string().max(500).optional().nullable(),
     delivery_date: z.string().datetime().optional(),
     gift_message: z.string().max(500).optional().nullable(),
+    delivery_time_slot: z.string().max(50).optional().nullable(),
+    is_anonymous_gift: z.boolean().optional(),
     payment_method: z.enum(['whatsapp', 'cliq', 'cash', 'card']),
 })
 
@@ -78,8 +83,24 @@ export async function POST(request: NextRequest) {
         delivery_notes,
         delivery_date,
         gift_message,
+        delivery_time_slot,
+        is_anonymous_gift,
+        awaiting_recipient_address,
+        recipient_name,
+        recipient_phone,
         payment_method,
     } = parsed.data
+
+    if (awaiting_recipient_address) {
+        if (!recipient_name || !recipient_phone) {
+            return NextResponse.json(
+                { error: 'Recipient name and phone are required when requesting their address' },
+                { status: 400 }
+            )
+        }
+    } else if (!delivery_address) {
+        return NextResponse.json({ error: 'Delivery address is required' }, { status: 400 })
+    }
 
     const realItems = items.filter((i) => !isCustomItem(i.product_id))
     const customItems = items.filter((i) => isCustomItem(i.product_id))
@@ -302,24 +323,29 @@ export async function POST(request: NextRequest) {
         customer_name,
         customer_phone,
         customer_email: customer_email || null,
-        delivery_address,
+        delivery_address: delivery_address || null,
         delivery_region: delivery_region || null,
         delivery_notes: delivery_notes || null,
         delivery_date: delivery_date || null,
         gift_message: gift_message || null,
+        delivery_time_slot: delivery_time_slot || null,
+        is_anonymous_gift: is_anonymous_gift || false,
+        awaiting_recipient_address: awaiting_recipient_address || false,
+        recipient_name: recipient_name || null,
+        recipient_phone: recipient_phone || null,
         payment_method,
         payment_status: 'pending',
-        status: 'pending',
+        status: awaiting_recipient_address ? 'awaiting_address' : 'pending',
         total,
         items: orderItems,
     }
 
     let orderResult
     if (user?.id) {
-        orderResult = await supabase.from('orders').insert(orderData).select('id').single()
+        orderResult = await supabase.from('orders').insert(orderData).select('id, recipient_address_token').single()
     } else {
         const serviceClient = createServiceClient()
-        orderResult = await serviceClient.from('orders').insert(orderData).select('id').single()
+        orderResult = await serviceClient.from('orders').insert(orderData).select('id, recipient_address_token').single()
     }
 
     if (orderResult.error) {
@@ -327,5 +353,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
     }
 
-    return NextResponse.json({ orderId: orderResult.data.id, total })
+    return NextResponse.json({
+        orderId: orderResult.data.id,
+        total,
+        recipientAddressToken: orderResult.data.recipient_address_token,
+    })
 }

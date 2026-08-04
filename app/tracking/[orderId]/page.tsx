@@ -110,8 +110,8 @@ export default function TrackingPage() {
                       <div className="flex flex-col items-center">
                         <div
                           className={`h-10 w-10 rounded-full flex items-center justify-center ${isCompleted
-                              ? 'bg-flore-primary text-white'
-                              : 'bg-flore-subtle text-flore-text-secondary'
+                            ? 'bg-flore-primary text-white'
+                            : 'bg-flore-subtle text-flore-text-secondary'
                             } ${isCurrent ? 'ring-4 ring-flore-primary/20' : ''}`}
                         >
                           {isCompleted ? (
@@ -123,8 +123,8 @@ export default function TrackingPage() {
                         {i < orderStatuses.length - 2 && (
                           <div
                             className={`w-0.5 flex-1 mt-2 ${isCompleted && i < currentStatusIndex
-                                ? 'bg-flore-primary'
-                                : 'bg-flore-border'
+                              ? 'bg-flore-primary'
+                              : 'bg-flore-border'
                               }`}
                           />
                         )}
@@ -155,18 +155,57 @@ export default function TrackingPage() {
               <CardTitle className="font-amiri text-xl">تفاصيل الطلب</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-flore-text-secondary">العنوان</span>
-                <span className="font-medium">{order.delivery_address}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-flore-text-secondary">المنطقة</span>
-                <span className="font-medium">{order.delivery_region}</span>
-              </div>
+              {order.awaiting_recipient_address ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <p className="font-bold text-amber-800 text-sm mb-1">بانتظار عنوان المستلم 📍</p>
+                  <p className="text-amber-700 text-xs leading-relaxed">
+                    أرسلنا رابطاً إلى {order.recipient_name || 'المستلم'} لإدخال عنوان التوصيل.
+                    سيبدأ تجهيز طلبك فور استلام العنوان.
+                  </p>
+                  {order.recipient_address_token && (
+                    <button
+                      onClick={() => {
+                        const link = `${window.location.origin}/recipient-address/${order.recipient_address_token}`
+                        const msg = `مرحباً ${order.recipient_name || ''}! 🌸 لديك هدية من Floré بانتظارك، الرجاء إدخال عنوانك من هنا: ${link}`
+                        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+                      }}
+                      className="text-flore-primary text-xs font-bold hover:underline mt-2"
+                    >
+                      إعادة إرسال الرابط للمستلم عبر واتساب
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-flore-text-secondary">العنوان</span>
+                    <span className="font-medium">{order.delivery_address}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-flore-text-secondary">المنطقة</span>
+                    <span className="font-medium">{order.delivery_region}</span>
+                  </div>
+                </>
+              )}
+
+              {order.delivery_time_slot && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-flore-text-secondary">فترة التوصيل</span>
+                  <span className="font-medium" dir="ltr">{order.delivery_time_slot}</span>
+                </div>
+              )}
+
               <div className="flex justify-between text-sm">
                 <span className="text-flore-text-secondary">الهاتف</span>
                 <span className="font-medium" dir="ltr">{order.customer_phone}</span>
               </div>
+
+              {order.is_anonymous_gift && (
+                <div className="bg-flore-subtle rounded-xl p-3 text-xs text-flore-text-secondary text-center">
+                  🎁 هذه هدية مجهولة المصدر — لن تتم مشاركة بياناتك مع المستلم
+                </div>
+              )}
+
               {order.gift_message && (
                 <div className="bg-flore-subtle rounded-xl p-4">
                   <p className="text-sm text-flore-text-secondary mb-1">رسالة الهدية:</p>

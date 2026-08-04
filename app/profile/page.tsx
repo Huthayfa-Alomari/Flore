@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import type { User } from '@supabase/supabase-js'
-import { ShoppingBag, Heart, Settings, LogOut, Camera, Loader2, Check } from 'lucide-react'
+import { ShoppingBag, Heart, Settings, LogOut, Camera, Loader2, Check, MapPin } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCart } from '@/hooks/useCart'
 import { Button } from '@/components/ui/Button'
@@ -15,7 +15,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
-  const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'settings'>('orders')
+  const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'addresses' | 'settings'>('orders')
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabaseRef = useRef(createClient())
@@ -28,6 +28,9 @@ export default function ProfilePage() {
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [addresses, setAddresses] = useState<{ id: string; label: string; region: string | null; address: string; is_default: boolean }[]>([])
+  const [newAddress, setNewAddress] = useState({ label: '', region: 'amman', address: '' })
+  const [savingAddress, setSavingAddress] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
   const fetchProfile = useCallback(async (userId: string) => {
@@ -49,6 +52,15 @@ export default function ProfilePage() {
     if (data) setOrders(data as Order[])
   }, [supabase])
 
+  const fetchAddresses = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('saved_addresses')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    if (data) setAddresses(data)
+  }, [supabase])
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -59,9 +71,10 @@ export default function ProfilePage() {
       setUser(user)
       fetchProfile(user.id)
       fetchOrders(user.id)
+      fetchAddresses(user.id)
     }
     getUser()
-  }, [supabase, router, fetchProfile, fetchOrders])
+  }, [supabase, router, fetchProfile, fetchOrders, fetchAddresses])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -129,6 +142,26 @@ export default function ProfilePage() {
     }
   }
 
+  const handleAddAddress = async () => {
+    if (!user || !newAddress.label.trim() || !newAddress.address.trim()) return
+    setSavingAddress(true)
+    const { data, error } = await supabase
+      .from('saved_addresses')
+      .insert({ user_id: user.id, ...newAddress })
+      .select()
+      .single()
+    if (!error && data) {
+      setAddresses(prev => [data, ...prev])
+      setNewAddress({ label: '', region: 'amman', address: '' })
+    }
+    setSavingAddress(false)
+  }
+
+  const handleDeleteAddress = async (id: string) => {
+    await supabase.from('saved_addresses').delete().eq('id', id)
+    setAddresses(prev => prev.filter(a => a.id !== id))
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -140,6 +173,7 @@ export default function ProfilePage() {
   const tabs = [
     { id: 'orders' as const, label: 'طلباتي', icon: ShoppingBag },
     { id: 'wishlist' as const, label: 'المفضلة', icon: Heart },
+    { id: 'addresses' as const, label: 'عناويني', icon: MapPin },
     { id: 'settings' as const, label: 'الإعدادات', icon: Settings },
   ]
 
@@ -254,6 +288,54 @@ export default function ProfilePage() {
 
           {activeTab === 'wishlist' && (
             <p className="text-center text-flore-text-secondary py-8">قائمة المفضلة فارغة</p>
+          )}
+
+          {activeTab === 'addresses' && (
+            <div className="space-y-4">
+              {addresses.map(addr => (
+                <div key={addr.id} className="border border-flore-border rounded-2xl p-4 flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-sm">{addr.label}</p>
+                    <p className="text-xs text-flore-text-secondary mt-1">{addr.address}</p>
+                    {addr.region && <p className="text-xs text-flore-text-secondary">{addr.region}</p>}
+                  </div>
+                  <button onClick={() => handleDeleteAddress(addr.id)} className="text-red-400 text-xs hover:underline">
+                    حذف
+                  </button>
+                </div>
+              ))}
+
+              <div className="border-t border-flore-border pt-4 space-y-3">
+                <p className="font-bold text-sm">إضافة عنوان جديد</p>
+                <input
+                  type="text"
+                  placeholder="مسمّى العنوان (مثال: المنزل)"
+                  value={newAddress.label}
+                  onChange={e => setNewAddress(prev => ({ ...prev, label: e.target.value }))}
+                  className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none"
+                />
+                <select
+                  value={newAddress.region}
+                  onChange={e => setNewAddress(prev => ({ ...prev, region: e.target.value }))}
+                  className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none"
+                >
+                  <option value="amman">عمّان</option>
+                  <option value="zarqa">الزرقاء</option>
+                  <option value="irbid">إربد</option>
+                  <option value="other">أخرى</option>
+                </select>
+                <textarea
+                  placeholder="العنوان بالتفصيل"
+                  value={newAddress.address}
+                  onChange={e => setNewAddress(prev => ({ ...prev, address: e.target.value }))}
+                  rows={2}
+                  className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none resize-none"
+                />
+                <Button onClick={handleAddAddress} disabled={savingAddress} className="w-full">
+                  {savingAddress ? 'جاري الحفظ...' : 'حفظ العنوان'}
+                </Button>
+              </div>
+            </div>
           )}
 
           {activeTab === 'settings' && (
