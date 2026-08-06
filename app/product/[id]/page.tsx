@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,6 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { FlowerAddButton } from '@/components/ui/FlowerAddButton'
 import { Badge } from '@/components/ui/Badge'
 import { ARFlowerViewer } from '@/components/catalog/ARFlowerViewer'
+import { ProductImageCarousel } from '@/components/catalog/ProductImageCarousel'
 import type { Product } from '@/types'
 
 export default function ProductDetailPage() {
@@ -20,7 +20,6 @@ export default function ProductDetailPage() {
   const productId = params.id as string
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedImage, setSelectedImage] = useState(0)
   const [showAR, setShowAR] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [copied, setCopied] = useState(false)
@@ -109,44 +108,16 @@ export default function ProductDetailPage() {
 
       <div className="grid md:grid-cols-2 gap-12">
         {/* Images */}
-        <div className="space-y-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="relative aspect-[4/5] rounded-3xl overflow-hidden bg-flore-subtle"
-          >
-            <Image
-              src={allImages[selectedImage]}
-              alt={product.name}
-              fill
-              className="object-cover"
-              priority
-            />
-            {product.badge && (
-              <div className="absolute top-4 right-4">
-                <Badge
-                  style={{ backgroundColor: product.badge_color || '#0D5C63' }}
-                  className="text-white"
-                >
-                  {product.badge}
-                </Badge>
-              </div>
-            )}
-          </motion.div>
-
-          {/* Thumbnails */}
-          {allImages.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {allImages.map((img, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSelectedImage(i)}
-                  className={`relative h-20 w-20 rounded-xl overflow-hidden flex-shrink-0 border-2 transition-colors ${selectedImage === i ? 'border-flore-primary' : 'border-transparent'
-                    }`}
-                >
-                  <Image src={img} alt={`${product.name} ${i + 1}`} fill className="object-cover" />
-                </button>
-              ))}
+        <div className="relative">
+          <ProductImageCarousel images={allImages} alt={product.name} />
+          {product.badge && (
+            <div className="absolute top-4 right-4 z-10">
+              <Badge
+                style={{ backgroundColor: product.badge_color || '#0D5C63' }}
+                className="text-white"
+              >
+                {product.badge}
+              </Badge>
             </div>
           )}
         </div>
