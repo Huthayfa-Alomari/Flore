@@ -132,6 +132,11 @@ export default function AtelierPage() {
   const [previewHovered, setPreviewHovered] = useState(false)
   const [showPresets, setShowPresets] = useState(true)
 
+  // ─── AI Preview States ─────────────────────────────────
+  const [aiImageUrl, setAiImageUrl] = useState<string | null>(null)
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false)
+  const [aiRemaining, setAiRemaining] = useState<number | null>(null)
+
   useEffect(() => {
     let isMounted = true
     async function loadData() {
@@ -216,6 +221,8 @@ export default function AtelierPage() {
       else next[id] = qty
       return next
     })
+    // إعادة ضبط صورة الذكاء الاصطناعي عند تغيير الزهور
+    setAiImageUrl(null)
   }, [])
 
   const updateGreeneryQty = useCallback((id: string, delta: number) => {
@@ -226,6 +233,7 @@ export default function AtelierPage() {
       else next[id] = qty
       return next
     })
+    setAiImageUrl(null)
   }, [])
 
   const applyPreset = useCallback((presetId: string) => {
@@ -244,12 +252,12 @@ export default function AtelierPage() {
       if (sun) next[sun.id] = 5
     }
     if (Object.keys(next).length === 0) {
-      // ما لقينا زهرة مطابقة — نبلغ المستخدم بدل ما نطبق باقة فاضية بصمت
       alert('عذراً، هذا الاقتراح غير متاح حالياً، اختر زهورك يدوياً 🌸')
       return
     }
     setSelectedFlowers(next)
     setShowPresets(false)
+    setAiImageUrl(null)
   }, [flowers])
 
   const clearAll = useCallback(() => {
@@ -260,7 +268,47 @@ export default function AtelierPage() {
     setGiftMessage('')
     setActiveStep('flowers')
     setShowPresets(true)
+    setAiImageUrl(null)
   }, [])
+
+  // ─── AI Preview Generator ─────────────────────────────
+  const handleGenerateAiPreview = useCallback(async () => {
+    if (totalFlowers === 0) {
+      alert('الرجاء اختيار زهور أولاً')
+      return
+    }
+
+    setIsGeneratingAi(true)
+    setAiImageUrl(null)
+
+    try {
+      const res = await fetch('/api/atelier/generate-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flowers: Object.entries(selectedFlowers).map(([id, qty]) => ({ id, qty })),
+          greenery: Object.entries(selectedGreenery).map(([id, qty]) => ({ id, qty })),
+          containerId: selectedContainer,
+          sizeKey: selectedSize,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(data.error || 'تعذر توليد الصورة حالياً')
+        setAiRemaining(data.remaining ?? aiRemaining)
+        return
+      }
+
+      setAiImageUrl(data.imageUrl)
+      setAiRemaining(data.remaining)
+    } catch {
+      alert('تعذر توليد الصورة حالياً، يرجى المحاولة مرة أخرى')
+    } finally {
+      setIsGeneratingAi(false)
+    }
+  }, [totalFlowers, selectedFlowers, selectedGreenery, selectedContainer, selectedSize, aiRemaining])
 
   const handleAddToCart = useCallback(() => {
     if (totalFlowers === 0) {
@@ -284,7 +332,7 @@ export default function AtelierPage() {
       category: 'custom' as const,
       price: totalPrice,
       currency: 'JOD',
-      image: flowers.find(f => selectedFlowers[f.id])?.image || '',
+      image: aiImageUrl || flowers.find(f => selectedFlowers[f.id])?.image || '',
       images: [],
       description: `زهور: ${selectedFlowerNames}${selectedContainerObj ? ` | حاوية: ${selectedContainerObj.name_ar || selectedContainerObj.name}` : ''}${size ? ` | الحجم: ${size.label_ar}` : ''}`,
       description_en: null,
@@ -321,8 +369,9 @@ export default function AtelierPage() {
     setTimeout(() => {
       window.location.href = '/cart'
     }, 1200)
-  }, [totalFlowers, selectedFlowers, flowers, selectedContainerObj, selectedContainer, totalPrice, giftMessage, addItem, bouquetSizes, selectedSize])
+  }, [totalFlowers, selectedFlowers, flowers, selectedContainerObj, selectedContainer, totalPrice, giftMessage, addItem, bouquetSizes, selectedSize, aiImageUrl])
 
+  // معاينة الـ CSS القديمة (تستخدم كـ Fallback أثناء عدم استخدام الذكاء الاصطناعي)
   const bouquetPreviewItems = useMemo(() => {
     const items: { color: string; image: string | null; size: number }[] = []
     Object.entries(selectedFlowers).forEach(([id, qty]) => {
@@ -548,7 +597,7 @@ export default function AtelierPage() {
               </div>
             )}
 
-            {/* CONTAINER (unified: box / wrap / vase / basket) */}
+            {/* CONTAINER */}
             {activeStep === 'container' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -557,7 +606,10 @@ export default function AtelierPage() {
                     return (
                       <button
                         key={c.id}
-                        onClick={() => setSelectedContainer(isSelected ? null : c.id)}
+                        onClick={() => {
+                          setSelectedContainer(isSelected ? null : c.id)
+                          setAiImageUrl(null)
+                        }}
                         className={`group relative rounded-2xl border-2 p-4 transition-all duration-300 text-center
                           ${isSelected ? 'border-flore-primary bg-flore-primary/5 shadow-lg' : 'border-flore-border bg-flore-card hover:border-flore-primary/50 hover:shadow-md'}`}
                       >
@@ -600,7 +652,10 @@ export default function AtelierPage() {
                     return (
                       <button
                         key={size.id}
-                        onClick={() => setSelectedSize(size.key)}
+                        onClick={() => {
+                          setSelectedSize(size.key)
+                          setAiImageUrl(null)
+                        }}
                         className={`text-right rounded-2xl border-2 p-4 transition-all ${isSelected ? 'border-flore-primary bg-flore-primary/5 shadow-lg' : 'border-flore-border bg-flore-card hover:border-flore-primary/50'}`}
                       >
                         <p className="font-bold text-flore-text-primary mb-1">{size.label_ar}</p>
@@ -665,58 +720,111 @@ export default function AtelierPage() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-flore-primary/10 to-transparent rounded-bl-full" />
                 <h3 className="font-amiri text-xl font-bold text-flore-text-primary mb-4 text-center relative z-10">معاينة الباقة</h3>
 
-                <div className="relative mx-auto w-full max-w-[280px] aspect-[3/4] mb-4">
-                  <div
-                    className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[70%] h-[55%] rounded-t-[40%] transition-all duration-500"
-                    style={{
-                      backgroundColor: 'var(--flore-gold)',
-                      backgroundImage: selectedContainerObj?.image ? `url(${selectedContainerObj.image})` : undefined,
-                      backgroundSize: 'cover',
-                      opacity: 0.85,
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-                    }}
-                  />
-                  <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-[85%] h-[55%] z-10">
-                    {bouquetPreviewItems.length === 0 ? (
-                      <div className="h-full flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="text-4xl mb-2 opacity-30">🌸</div>
-                          <p className="text-flore-text-secondary text-sm">اختر زهوراً لتظهر هنا</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="relative w-full h-full">
-                        {bouquetPreviewItems.map((item, i) => {
-                          const row = Math.floor(i / 3)
-                          const col = i % 3
-                          const offsetX = (col - 1) * 35 + (Math.random() - 0.5) * 20
-                          const offsetY = row * 30 + (Math.random() - 0.5) * 15
-                          const rotation = (Math.random() - 0.5) * 40
-                          return (
-                            <div
-                              key={i}
-                              className="absolute transition-all duration-500 ease-out"
-                              style={{
-                                left: `calc(50% + ${offsetX}px)`,
-                                top: `${offsetY}px`,
-                                transform: `translate(-50%, 0) rotate(${rotation}deg) scale(${previewHovered ? 1.1 : 1})`,
-                                zIndex: 10 + row,
-                              }}
-                            >
-                              {item.image ? (
-                                <div className="rounded-full overflow-hidden border-2 border-white shadow-md" style={{ width: item.size, height: item.size }}>
-                                  <Image src={item.image} alt="" width={item.size} height={item.size} className="object-cover" />
-                                </div>
-                              ) : (
-                                <div className="rounded-full border-2 border-white shadow-md" style={{ width: item.size, height: item.size, backgroundColor: item.color }} />
-                              )}
+                <div className="relative mx-auto w-full max-w-[280px] aspect-[3/4] mb-4 rounded-2xl overflow-hidden bg-flore-bg/50 flex items-center justify-center">
+
+                  {/* زر توليد الذكاء الاصطناعي */}
+                  {totalFlowers > 0 && !aiImageUrl && !isGeneratingAi && (
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-flore-bg/80 backdrop-blur-sm p-4 text-center">
+                      <div className="text-3xl mb-2">🪄</div>
+                      <p className="text-flore-text-primary font-bold text-sm mb-3">هل تريد رؤية شكل باقتك فعلياً؟</p>
+                      <button
+                        onClick={handleGenerateAiPreview}
+                        disabled={aiRemaining === 0}
+                        className="bg-flore-primary text-white px-4 py-2 rounded-xl font-bold text-sm hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        توليد معاينة واقعية (AI) 📸
+                      </button>
+                      <span className="text-xs text-flore-text-secondary mt-2">
+                        {aiRemaining === null ? 'حتى 5 محاولات يومياً' : aiRemaining > 0 ? `محاولات متبقية: ${aiRemaining}` : 'انتهت محاولاتك لهذا اليوم'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* حالة تحميل الذكاء الاصطناعي */}
+                  {isGeneratingAi && (
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-flore-bg/90 backdrop-blur-sm">
+                      <div className="w-12 h-12 rounded-full border-4 border-flore-primary/20 border-t-flore-primary animate-spin mb-3"></div>
+                      <p className="text-flore-text-primary font-bold text-sm">جاري تصميم باقتك بالذكاء الاصطناعي...</p>
+                      <p className="text-flore-text-secondary text-xs mt-1">قد يستغرق ذلك 15 ثانية</p>
+                    </div>
+                  )}
+
+                  {/* عرض صورة الذكاء الاصطناعي */}
+                  {aiImageUrl ? (
+                    <Image
+                      src={aiImageUrl}
+                      alt="معاينة الباقة بالذكاء الاصطناعي"
+                      fill
+                      className="object-cover transition-transform duration-700 hover:scale-105"
+                    />
+                  ) : (
+                    // المعاينة الافتراضية (CSS Fallback)
+                    !isGeneratingAi && (
+                      <>
+                        <div
+                          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[70%] h-[55%] rounded-t-[40%] transition-all duration-500"
+                          style={{
+                            backgroundColor: 'var(--flore-gold)',
+                            backgroundImage: selectedContainerObj?.image ? `url(${selectedContainerObj.image})` : undefined,
+                            backgroundSize: 'cover',
+                            opacity: 0.85,
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                          }}
+                        />
+                        <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-[85%] h-[55%] z-10">
+                          {bouquetPreviewItems.length === 0 ? (
+                            <div className="h-full flex items-center justify-center">
+                              <div className="text-center">
+                                <div className="text-4xl mb-2 opacity-30">🌸</div>
+                                <p className="text-flore-text-secondary text-sm">اختر زهوراً لتظهر هنا</p>
+                              </div>
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
+                          ) : (
+                            <div className="relative w-full h-full">
+                              {bouquetPreviewItems.map((item, i) => {
+                                const row = Math.floor(i / 3)
+                                const col = i % 3
+                                const offsetX = (col - 1) * 35 + (Math.random() - 0.5) * 20
+                                const offsetY = row * 30 + (Math.random() - 0.5) * 15
+                                const rotation = (Math.random() - 0.5) * 40
+                                return (
+                                  <div
+                                    key={i}
+                                    className="absolute transition-all duration-500 ease-out"
+                                    style={{
+                                      left: `calc(50% + ${offsetX}px)`,
+                                      top: `${offsetY}px`,
+                                      transform: `translate(-50%, 0) rotate(${rotation}deg) scale(${previewHovered ? 1.1 : 1})`,
+                                      zIndex: 10 + row,
+                                    }}
+                                  >
+                                    {item.image ? (
+                                      <div className="rounded-full overflow-hidden border-2 border-white shadow-md" style={{ width: item.size, height: item.size }}>
+                                        <Image src={item.image} alt="" width={item.size} height={item.size} className="object-cover" />
+                                      </div>
+                                    ) : (
+                                      <div className="rounded-full border-2 border-white shadow-md" style={{ width: item.size, height: item.size, backgroundColor: item.color }} />
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )
+                  )}
                 </div>
+
+                {aiImageUrl && (
+                  <button
+                    onClick={handleGenerateAiPreview}
+                    disabled={aiRemaining === 0 || isGeneratingAi}
+                    className="w-full mb-3 text-sm text-flore-primary bg-flore-primary/10 py-2 rounded-lg font-bold hover:bg-flore-primary/20 transition disabled:opacity-50"
+                  >
+                    {aiRemaining === 0 ? 'انتهت المحاولات' : '🔁 إعادة التوليد'}
+                  </button>
+                )}
 
                 {giftMessage && (
                   <div className="bg-flore-bg rounded-xl p-3 mb-4 border border-flore-border">
