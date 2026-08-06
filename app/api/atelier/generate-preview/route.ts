@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import sharp from 'sharp'
 
 const DAILY_LIMIT = 5
 
@@ -115,11 +116,22 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'تعذر توليد الصورة، حاول مرة أخرى' }, { status: 502 })
     }
 
+    // ── إعادة ترميز الصورة بصيغة JPEG قياسية نظيفة، يضمن توافقها مع next/image optimizer ──
+    let normalizedBuffer: Buffer
+    try {
+        normalizedBuffer = await sharp(Buffer.from(imageBuffer))
+            .jpeg({ quality: 90 })
+            .toBuffer()
+    } catch (err) {
+        console.error('[atelier/generate-preview] Image normalization failed:', err)
+        return NextResponse.json({ error: 'تعذر معالجة الصورة، حاول مرة أخرى' }, { status: 502 })
+    }
+
     // ── رفع فوري للتخزين الدائم (Supabase Storage) ──
     const fileName = `preview-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
     const { error: uploadError } = await serviceClient.storage
         .from('atelier-previews')
-        .upload(fileName, imageBuffer, { contentType: 'image/jpeg', upsert: false })
+        .upload(fileName, normalizedBuffer, { contentType: 'image/jpeg', upsert: false })
 
     if (uploadError) {
         console.error('[atelier/generate-preview] Upload error:', uploadError)
