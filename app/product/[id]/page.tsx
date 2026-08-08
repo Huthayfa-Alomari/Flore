@@ -179,7 +179,7 @@ export default function ProductDetailPage() {
               variant="primary"
               onClick={() => addItem({ product, quantity })}
             >
-              أضف للسلة - {product.price * quantity} د.أ
+              أضف لهديتك - {product.price * quantity} د.أ
             </FlowerAddButton>
 
             <div className="flex gap-3">

@@ -100,6 +100,11 @@ export default function HomeContent({ featuredProducts }: HomeContentProps) {
                 </div>
             </section>
 
+            {/* Divider */}
+            <div className="flex justify-center">
+                <div className="w-24 h-px bg-gradient-to-r from-transparent via-flore-gold-dark to-transparent" />
+            </div>
+
             {/* Featured Products */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-12">
@@ -114,6 +119,11 @@ export default function HomeContent({ featuredProducts }: HomeContentProps) {
                     ))}
                 </div>
             </section>
+
+            {/* Divider */}
+            <div className="flex justify-center">
+                <div className="w-24 h-px bg-gradient-to-r from-transparent via-flore-gold-dark to-transparent" />
+            </div>
 
             {/* Categories */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -147,6 +157,11 @@ export default function HomeContent({ featuredProducts }: HomeContentProps) {
                     })}
                 </div>
             </section>
+
+            {/* Divider */}
+            <div className="flex justify-center">
+                <div className="w-24 h-px bg-gradient-to-r from-transparent via-flore-gold-dark to-transparent" />
+            </div>
 
             {/* AR Teaser */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -187,6 +202,11 @@ export default function HomeContent({ featuredProducts }: HomeContentProps) {
                 </div>
             </section>
 
+            {/* Divider */}
+            <div className="flex justify-center">
+                <div className="w-24 h-px bg-gradient-to-r from-transparent via-flore-gold-dark to-transparent" />
+            </div>
+
             {/* Atelier Teaser */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="bg-gradient-to-br from-flore-primary to-flore-primary-dark rounded-3xl p-8 md:p-12 text-white">
@@ -218,6 +238,11 @@ export default function HomeContent({ featuredProducts }: HomeContentProps) {
                     </div>
                 </div>
             </section>
+
+            {/* Divider */}
+            <div className="flex justify-center">
+                <div className="w-24 h-px bg-gradient-to-r from-transparent via-flore-gold-dark to-transparent" />
+            </div>
 
             {/* Testimonials */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -254,6 +279,11 @@ export default function HomeContent({ featuredProducts }: HomeContentProps) {
                     ))}
                 </div>
             </section>
+
+            {/* Divider */}
+            <div className="flex justify-center">
+                <div className="w-24 h-px bg-gradient-to-r from-transparent via-flore-gold-dark to-transparent" />
+            </div>
 
             {/* Gallery */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">

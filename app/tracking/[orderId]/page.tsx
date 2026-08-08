@@ -1,312 +1,478 @@
-'use client'
+"use client"
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import Image from 'next/image'
-import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { MapPin, Thermometer, Droplets, Clock, Truck, Package, CheckCircle, ChevronLeft, Loader2 } from 'lucide-react'
-import { useRealtimeOrder } from '@/hooks/useRealtimeOrder'
+import { MapPin, User, MessageSquare, CreditCard, Banknote, MessageCircle, ArrowLeft, Clock } from 'lucide-react'
+import { useCart } from '@/lib/store/cart-store'
 import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { orderStatuses } from '@/lib/utils'
-import { GiftQRCode } from '@/components/gift/GiftQRCode'
+import { formatPrice, generateWhatsAppMessage } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import { GiftMediaRecorder } from '@/components/checkout/GiftMediaRecorder'
 
-// استيراد مكوّن الخريطة التفاعلية ديناميكياً لتفادي مشاكل SSR مع Leaflet
-const LiveMap = dynamic(
-  () => import('@/components/tracking/LiveMap').then((m) => m.LiveMap),
-  {
-    ssr: false,
-    loading: () => <div className="aspect-square bg-flore-subtle animate-pulse" />,
-  }
-)
+export default function CheckoutPage() {
+  const router = useRouter()
+  const { items, getTotal, clearCart } = useCart()
+  const [loading, setLoading] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    region: 'amman',
+    payment: 'whatsapp',
+    giftMessage: '',
+    notes: '',
+    deliveryTimeSlot: '',
+    isAnonymousGift: false,
+    askRecipientAddress: false,
+    recipientName: '',
+    recipientPhone: '',
+  })
 
-export default function TrackingPage() {
-  const params = useParams()
-  const orderId = (params?.orderId || params?.id) as string
-  const { order, loading } = useRealtimeOrder(orderId)
-  const [origin, setOrigin] = useState('')
+  const [giftMedia, setGiftMedia] = useState<{ blob: Blob; type: 'audio' | 'video' } | null>(null)
+
+  const supabase = createClient()
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOrigin(window.location.origin)
+    setMounted(true)
+
+    if (items.length === 0) {
+      router.push('/cart')
+      return
+    }
+
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUserId(session.user.id)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, phone')
+          .eq('id', session.user.id)
+          .single()
+        if (profile) {
+          const p = profile as { full_name?: string; phone?: string }
+          setForm(prev => ({
+            ...prev,
+            name: p.full_name || '',
+            phone: p.phone || '',
+          }))
+        }
+      }
+    }
+    checkSession()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const savedCity = localStorage.getItem('flore_delivery_city')
+    if (savedCity) {
+      setForm(prev => ({ ...prev, region: savedCity }))
     }
   }, [])
 
-  if (loading) {
+  if (!mounted) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-flore-primary" />
+      <div className="min-h-screen bg-flore-bg flex items-center justify-center">
+        <div className="animate-pulse font-amiri text-xl text-flore-primary">
+          جاري تحميل صفحة الدفع...
+        </div>
       </div>
     )
   }
 
-  if (!order) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <Package className="h-16 w-16 text-flore-text-secondary mx-auto mb-4" />
-        <h1 className="font-amiri text-3xl font-bold text-flore-text-primary mb-4">
-          الطلب غير موجود
-        </h1>
-        <Link href="/profile">
-          <Button>العودة للحساب</Button>
-        </Link>
-      </div>
-    )
+  if (items.length === 0) return null
+
+  const uploadGiftMedia = async (orderId: string) => {
+    if (!giftMedia) return
+
+    const formData = new FormData()
+    formData.append('media', giftMedia.blob, giftMedia.type === 'video' ? 'gift.webm' : 'gift-audio.webm')
+    formData.append('customerPhone', form.phone)
+
+    try {
+      const res = await fetch(`/api/orders/${orderId}/gift-media`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        console.error('Gift media upload failed:', await res.text())
+        // ما نوقف عملية الطلب — رفع الرسالة فشل بس الطلب نفسه نجح، نكمل عادي
+      }
+    } catch (err) {
+      console.error('Gift media upload error:', err)
+    }
   }
 
-  const currentStatusIndex = orderStatuses.findIndex((s) => s.value === order.status)
-  const statusInfo = orderStatuses.find((s) => s.value === order.status)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (loading) return
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: items.map(item => ({
+            product_id: item.product.id,
+            qty: item.quantity,
+            customization: item.customization || null,
+            ...(item.bouquetSelection && { bouquet_selection: item.bouquetSelection }),
+          })),
+          customer_name: form.name,
+          customer_phone: form.phone,
+          ...(form.askRecipientAddress
+            ? { awaiting_recipient_address: true, recipient_name: form.recipientName, recipient_phone: form.recipientPhone }
+            : { delivery_address: form.address, delivery_region: form.region.toLowerCase() }),
+          gift_message: form.giftMessage || null,
+          delivery_notes: form.notes || null,
+          payment_method: form.payment.toLowerCase(),
+          delivery_time_slot: form.deliveryTimeSlot || null,
+          is_anonymous_gift: form.isAnonymousGift,
+        }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        const message = typeof err.error === 'string'
+          ? err.error
+          : 'بيانات الطلب غير صحيحة، يرجى المراجعة'
+        throw new Error(message)
+      }
+
+      const { orderId, total: serverTotal, recipientAddressToken } = await response.json()
+      const orderTotal = serverTotal || getTotal()
+
+      // ارفع رسالة الإهداء (صوت/فيديو) فور نجاح إنشاء الطلب، قبل أي خطوة دفع
+      await uploadGiftMedia(orderId)
+
+      if (form.askRecipientAddress) {
+        const link = `${window.location.origin}/recipient-address/${recipientAddressToken}`
+        const msg = `مرحباً ${form.recipientName}! 🌸 لديك هدية من Floré بانتظارك، الرجاء إدخال عنوانك من هنا: ${link}`
+        const waNumber = form.recipientPhone.replace(/^0/, '962')
+        window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank')
+        clearCart()
+        router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
+      } else if (form.payment === 'whatsapp') {
+        const message = generateWhatsAppMessage(items, orderTotal)
+        const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '962790000000'
+        const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+        window.open(whatsappUrl, '_blank')
+        clearCart()
+        router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
+
+      } else if (form.payment === 'cliq') {
+        const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '962790000000'
+        const cliqMessage = `مرحباً، حوّلت مبلغ ${formatPrice(orderTotal)} عبر CliQ لطلب رقم #${orderId.slice(0, 8)}\nمرفق لقطة الشاشة للتأكيد 🌸`
+        const cliqWhatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(cliqMessage)}`
+
+        alert(`تم تسجيل طلبك بنجاح 🌸\n\nيرجى تحويل المبلغ عبر CliQ إلى:\nAlias: HUTHYFAO\n\nبعدها سيتم فتح واتساب لإرسال لقطة شاشة التحويل لتأكيد طلبك.`)
+        window.open(cliqWhatsappUrl, '_blank')
+        clearCart()
+        router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
+
+      } else if (form.payment === 'cash') {
+        alert('تم تسجيل طلبك بنجاح 🌸. سيتم الدفع نقداً عند استلام الباقة الفاخرة.')
+        clearCart()
+        router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
+      } else if (form.payment === 'card') {
+        const ptRes = await fetch('/api/payment/paytabs/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        })
+        const ptData = await ptRes.json()
+
+        if (!ptRes.ok) {
+          const message = typeof ptData.error === 'string' ? ptData.error : 'فشل بدء عملية الدفع'
+          throw new Error(message)
+        }
+
+        clearCart()
+        if (ptData.redirectUrl) {
+          window.location.href = ptData.redirectUrl // توجيه فوري لصفحة PayTabs الآمنة
+        } else {
+          router.push(userId ? `/profile?order=${orderId}` : `/tracking/${orderId}`)
+        }
+      }
+
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء معالجة الطلب'
+      console.error('Checkout error:', err)
+      alert(message + ' — يرجى المحاولة مرة أخرى أو التواصل معنا مباشرة.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const paymentMethods = [
+    { id: 'card', label: 'بطاقة ائتمانية', icon: CreditCard, desc: 'Visa / Mastercard عبر PayTabs' },
+    { id: 'whatsapp', label: 'واتساب', icon: MessageCircle, desc: 'تأكيد فوري وفاتورة مباشرة' },
+    { id: 'cliq', label: 'تطبيق CliQ', icon: Banknote, desc: 'تحويل يدوي عبر الـ Alias' },
+    { id: 'cash', label: 'كاش عند الاستلام', icon: Banknote, desc: 'الدفع نقداً لسائق فلوري' },
+  ]
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <Link
-        href="/profile"
-        className="inline-flex items-center gap-2 text-flore-text-secondary hover:text-flore-primary mb-8 transition-colors"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        <span className="font-noto text-sm">العودة للحساب</span>
-      </Link>
+    <div className="min-h-screen bg-flore-bg pb-24 font-noto text-right" dir="rtl">
+      <div className="max-w-2xl mx-auto px-4 py-12">
 
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="font-amiri text-3xl font-bold text-flore-text-primary">
-              تتبع الطلب
-            </h1>
-            <p className="text-flore-text-secondary mt-1">
-              طلب #{order.id.slice(0, 8)}
-            </p>
-          </div>
-          <Badge className={statusInfo?.color || ''}>
-            {statusInfo?.label || order.status}
-          </Badge>
-        </div>
-      </div>
+        <button
+          onClick={() => router.push('/cart')}
+          className="flex items-center gap-2 text-flore-primary mb-6 hover:underline font-medium"
+        >
+          <ArrowLeft className="h-4 w-4 rotate-180" /> العودة للسلة
+        </button>
 
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Status Timeline & Details */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-amiri text-xl">حالة الطلب</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative">
-                {orderStatuses.slice(0, -1).map((status, i) => {
-                  const isCompleted = i <= currentStatusIndex
-                  const isCurrent = i === currentStatusIndex
+        <h1 className="font-amiri text-4xl font-bold text-flore-text-primary mb-3 text-center">
+          لحظات قليلة تفصلك عن إسعاد أحدهم
+        </h1>
+        <p className="text-center text-flore-text-secondary mb-8 text-sm">
+          مراجعة آمنة وموثقة للطلب | جميع الأسعار بالدينار الأردني (JOD)
+        </p>
 
-                  return (
-                    <motion.div
-                      key={status.value}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.1 }}
-                      className="flex gap-4 pb-8 last:pb-0"
-                    >
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`h-10 w-10 rounded-full flex items-center justify-center ${isCompleted
-                            ? 'bg-flore-primary text-white'
-                            : 'bg-flore-subtle text-flore-text-secondary'
-                            } ${isCurrent ? 'ring-4 ring-flore-primary/20' : ''}`}
-                        >
-                          {isCompleted ? (
-                            <CheckCircle className="h-5 w-5" />
-                          ) : (
-                            <Clock className="h-5 w-5" />
-                          )}
-                        </div>
-                        {i < orderStatuses.length - 2 && (
-                          <div
-                            className={`w-0.5 flex-1 mt-2 ${isCompleted && i < currentStatusIndex
-                              ? 'bg-flore-primary'
-                              : 'bg-flore-border'
-                              }`}
-                          />
-                        )}
-                      </div>
-                      <div className="pt-1">
-                        <p
-                          className={`font-medium ${isCurrent ? 'text-flore-primary' : 'text-flore-text-primary'
-                            }`}
-                        >
-                          {status.label}
-                        </p>
-                        {isCurrent && order.estimated_arrival && (
-                          <p className="text-sm text-flore-text-secondary mt-1">
-                            الوصول المتوقع: {new Date(order.estimated_arrival).toLocaleTimeString('ar-JO')}
-                          </p>
-                        )}
-                      </div>
-                    </motion.div>
-                  )
-                })}
+        <form onSubmit={handleSubmit} className="space-y-6">
+
+          {/* معلومات التواصل */}
+          <section className="bg-flore-card rounded-3xl p-6 shadow-luxury border border-flore-border">
+            <h2 className="font-amiri text-xl font-bold mb-4 flex items-center gap-2 text-flore-primary">
+              <User className="h-5 w-5" /> معلومات التواصل
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-flore-text-secondary mb-1">الاسم الكامل</label>
+                <input
+                  required type="text" value={form.name}
+                  onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none transition-colors"
+                  placeholder="محمد أحمد"
+                />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Order Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-amiri text-xl">تفاصيل الطلب</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {order.awaiting_recipient_address ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <p className="font-bold text-amber-800 text-sm mb-1">بانتظار عنوان المستلم 📍</p>
-                  <p className="text-amber-700 text-xs leading-relaxed">
-                    أرسلنا رابطاً إلى {order.recipient_name || 'المستلم'} لإدخال عنوان التوصيل.
-                    سيبدأ تجهيز طلبك فور استلام العنوان.
-                  </p>
-                  {order.recipient_address_token && (
-                    <button
-                      onClick={() => {
-                        const link = `${window.location.origin}/recipient-address/${order.recipient_address_token}`
-                        const msg = `مرحباً ${order.recipient_name || ''}! 🌸 لديك هدية من Floré بانتظارك، الرجاء إدخال عنوانك من هنا: ${link}`
-                        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
-                      }}
-                      className="text-flore-primary text-xs font-bold hover:underline mt-2"
-                    >
-                      إعادة إرسال الرابط للمستلم عبر واتساب
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-flore-text-secondary">العنوان</span>
-                    <span className="font-medium">{order.delivery_address}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-flore-text-secondary">المنطقة</span>
-                    <span className="font-medium">{order.delivery_region}</span>
-                  </div>
-                </>
-              )}
-
-              {order.delivery_time_slot && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-flore-text-secondary">فترة التوصيل</span>
-                  <span className="font-medium" dir="ltr">{order.delivery_time_slot}</span>
-                </div>
-              )}
-
-              <div className="flex justify-between text-sm">
-                <span className="text-flore-text-secondary">الهاتف</span>
-                <span className="font-medium" dir="ltr">{order.customer_phone}</span>
+              <div>
+                <label className="block text-sm text-flore-text-secondary mb-1">رقم الهاتف</label>
+                <input
+                  required type="tel" value={form.phone}
+                  onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
+                  className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none transition-colors"
+                  placeholder="0790000000" dir="ltr"
+                />
               </div>
+            </div>
+          </section>
 
-              {order.is_anonymous_gift && (
-                <div className="bg-flore-subtle rounded-xl p-3 text-xs text-flore-text-secondary text-center">
-                  🎁 هذه هدية مجهولة المصدر — لن تتم مشاركة بياناتك مع المستلم
+          {/* عنوان التوصيل */}
+          <section className="bg-flore-card rounded-3xl p-6 shadow-luxury border border-flore-border">
+            <h2 className="font-amiri text-xl font-bold mb-4 flex items-center gap-2 text-flore-primary">
+              <MapPin className="h-5 w-5" /> وجهة التوصيل
+            </h2>
+            <label className="flex items-center justify-between mb-4 cursor-pointer bg-flore-bg rounded-xl p-3">
+              <div>
+                <p className="font-bold text-sm text-flore-text-primary">اطلب العنوان من المستلم</p>
+                <p className="text-xs text-flore-text-secondary mt-0.5">سنرسل للمستلم رابطاً لإدخال عنوانه بنفسه</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={form.askRecipientAddress}
+                onChange={e => setForm(prev => ({ ...prev, askRecipientAddress: e.target.checked }))}
+                className="w-5 h-5 rounded accent-flore-primary"
+              />
+            </label>
+
+            {form.askRecipientAddress ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-flore-text-secondary mb-1">اسم المستلم</label>
+                  <input
+                    required
+                    type="text"
+                    value={form.recipientName}
+                    onChange={e => setForm(prev => ({ ...prev, recipientName: e.target.value }))}
+                    className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none"
+                  />
                 </div>
-              )}
-
-              {order.gift_message && (
-                <div className="bg-flore-subtle rounded-xl p-4">
-                  <p className="text-sm text-flore-text-secondary mb-1">رسالة الهدية:</p>
-                  <p className="font-medium italic">{order.gift_message}</p>
+                <div>
+                  <label className="block text-sm text-flore-text-secondary mb-1">رقم هاتف المستلم</label>
+                  <input
+                    required
+                    type="tel"
+                    value={form.recipientPhone}
+                    onChange={e => setForm(prev => ({ ...prev, recipientPhone: e.target.value }))}
+                    dir="ltr"
+                    className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none"
+                  />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Gift QR Code Card */}
-          {order.gift_media_url && order.gift_token && origin && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-amiri text-xl">رمز الهدية (QR Code)</CardTitle>
-              </CardHeader>
-              <CardContent className="flex justify-center py-4">
-                <GiftQRCode giftUrl={`${origin}/gift/${order.gift_token}`} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Sensor Data */}
-          {(order.temperature || order.humidity) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-amiri text-xl">جودة التوصيل</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                {order.temperature && (
-                  <div className="bg-flore-subtle rounded-xl p-4 text-center">
-                    <Thermometer className="h-6 w-6 mx-auto mb-2 text-flore-primary" />
-                    <p className="text-2xl font-bold">{order.temperature}°C</p>
-                    <p className="text-xs text-flore-text-secondary">درجة الحرارة</p>
-                  </div>
-                )}
-                {order.humidity && (
-                  <div className="bg-flore-subtle rounded-xl p-4 text-center">
-                    <Droplets className="h-6 w-6 mx-auto mb-2 text-flore-primary" />
-                    <p className="text-2xl font-bold">{order.humidity}%</p>
-                    <p className="text-xs text-flore-text-secondary">الرطوبة</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Map & Items */}
-        <div className="space-y-6">
-          <Card className="overflow-hidden">
-            <CardHeader>
-              <CardTitle className="font-amiri text-xl flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                موقع السائق
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {order.driver_lat && order.driver_lng ? (
-                <div className="aspect-square bg-flore-subtle">
-                  <LiveMap lat={order.driver_lat} lng={order.driver_lng} />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-flore-text-secondary mb-1">المنطقة</label>
+                  <select
+                    value={form.region}
+                    onChange={e => setForm(prev => ({ ...prev, region: e.target.value }))}
+                    className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none transition-colors cursor-pointer"
+                  >
+                    <option value="amman">عمّان</option>
+                    <option value="zarqa">الزرقاء</option>
+                    <option value="irbid">إربد</option>
+                    <option value="other">أخرى</option>
+                  </select>
                 </div>
-              ) : (
-                <div className="aspect-square bg-flore-subtle flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <Truck className="h-12 w-12 text-flore-text-secondary mx-auto mb-4" />
-                    <p className="text-flore-text-secondary">
-                      السائق لم يبدأ التوصيل بعد
+                <div>
+                  <label className="block text-sm text-flore-text-secondary mb-1">العنوان بالتفصيل</label>
+                  <textarea
+                    required value={form.address}
+                    onChange={e => setForm(prev => ({ ...prev, address: e.target.value }))}
+                    className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none resize-none transition-colors"
+                    rows={2} placeholder="الشارع، رقم البناء، المعالم القريبة"
+                  />
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* طريقة الدفع */}
+          <section className="bg-flore-card rounded-3xl p-6 shadow-luxury border border-flore-border">
+            <h2 className="font-amiri text-xl font-bold mb-4 flex items-center gap-2 text-flore-primary">
+              <CreditCard className="h-5 w-5" /> طريقة الدفع
+            </h2>
+            <div className="grid grid-cols-3 gap-3">
+              {paymentMethods.map(method => {
+                const Icon = method.icon
+                const isSelected = form.payment === method.id
+                return (
+                  <button
+                    key={method.id} type="button"
+                    onClick={() => setForm(prev => ({ ...prev, payment: method.id }))}
+                    className={`rounded-2xl p-4 text-center border-2 transition-all duration-200 flex flex-col items-center justify-center ${isSelected
+                      ? 'border-flore-primary bg-purple-50/40 shadow-sm scale-[1.02]'
+                      : 'border-flore-border bg-flore-card hover:border-flore-primary/50'
+                      }`}
+                  >
+                    <Icon className={`h-6 w-6 mb-2 ${isSelected ? 'text-flore-primary' : 'text-flore-text-secondary'}`} />
+                    <p className={`font-bold text-xs md:text-sm ${isSelected ? 'text-flore-primary' : 'text-flore-text-primary'}`}>
+                      {method.label}
                     </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <p className="text-[10px] text-flore-text-secondary mt-1 hidden md:block">
+                      {method.desc}
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
 
-          {/* Items Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-amiri text-xl">المنتجات</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {order.items.map((item, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-lg bg-flore-subtle overflow-hidden relative">
-                    {item.image && (
-                      <Image src={item.image} alt={item.name} fill className="object-cover" sizes="48px" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-flore-text-secondary">{item.qty}x</p>
-                  </div>
-                  <span className="font-bold">{item.price * item.qty} د.أ</span>
-                </div>
-              ))}
-              <div className="border-t border-flore-border pt-3 flex justify-between font-bold">
-                <span>الإجمالي</span>
-                <span className="text-flore-primary">{order.total} د.أ</span>
+            {form.payment === 'cliq' && (
+              <div className="mt-4 p-4 bg-flore-bg rounded-xl border border-flore-border text-center">
+                <p className="text-sm text-flore-text-secondary mb-1">حوّل عبر تطبيق بنكك إلى:</p>
+                <p className="font-bold text-flore-primary text-lg" dir="ltr">HUTHYFAO</p>
+                <p className="text-xs text-flore-text-secondary mt-2">
+                  بعد إتمام الطلب سيُفتح واتساب تلقائياً لإرسال إثبات التحويل
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+          </section>
+
+          {/* وقت التوصيل */}
+          <section className="bg-flore-card rounded-3xl p-6 shadow-luxury border border-flore-border">
+            <h2 className="font-amiri text-xl font-bold mb-4 flex items-center gap-2 text-flore-primary">
+              <Clock className="h-5 w-5" /> وقت التوصيل المفضّل
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { value: '09:00-13:00', label: 'صباحاً', desc: '9:00 - 1:00' },
+                { value: '13:00-17:00', label: 'ظهراً', desc: '1:00 - 5:00' },
+                { value: '17:00-21:00', label: 'مساءً', desc: '5:00 - 9:00' },
+                { value: '', label: 'أي وقت', desc: 'حسب توفر السائق' },
+              ].map(slot => (
+                <button
+                  key={slot.value}
+                  type="button"
+                  onClick={() => setForm(prev => ({ ...prev, deliveryTimeSlot: slot.value }))}
+                  className={`p-3 rounded-xl border-2 text-center transition-all ${form.deliveryTimeSlot === slot.value
+                    ? 'border-flore-primary bg-flore-primary/5'
+                    : 'border-flore-border bg-flore-bg'
+                    }`}
+                >
+                  <p className="font-bold text-sm text-flore-text-primary">{slot.label}</p>
+                  <p className="text-xs text-flore-text-secondary">{slot.desc}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* هدية مجهولة المصدر */}
+          <section className="bg-flore-card rounded-3xl p-6 shadow-luxury border border-flore-border">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <p className="font-bold text-flore-text-primary">إخفاء هويتي عن المستلم</p>
+                <p className="text-xs text-flore-text-secondary mt-1">لن نشارك اسمك أو رقمك مع المستلم حتى لو سأل</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={form.isAnonymousGift}
+                onChange={e => setForm(prev => ({ ...prev, isAnonymousGift: e.target.checked }))}
+                className="w-5 h-5 rounded accent-flore-primary"
+              />
+            </label>
+          </section>
+
+          {/* رسالة الإهداء */}
+          <section className="bg-flore-card rounded-3xl p-6 shadow-luxury border border-flore-border">
+            <h2 className="font-amiri text-xl font-bold mb-4 flex items-center gap-2 text-flore-primary">
+              <MessageSquare className="h-5 w-5" /> رسالة كرت الإهداء (اختياري)
+            </h2>
+            <textarea
+              value={form.giftMessage}
+              onChange={e => setForm(prev => ({ ...prev, giftMessage: e.target.value }))}
+              className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none resize-none transition-colors mb-4"
+              rows={2} placeholder="اكتب كلمات الإهداء التي ترغب في إرفاقها مع الباقة..."
+            />
+
+            <p className="text-sm text-flore-text-secondary mb-2">
+              🎙️ أضف رسالة صوتية أو فيديو قصير — سيصل المُستقبل رمز QR على البطاقة يستمع فيه لصوتك
+            </p>
+            <GiftMediaRecorder onRecorded={(blob, type) => setGiftMedia({ blob, type })} />
+          </section>
+
+          {/* ملاحظات */}
+          <section className="bg-flore-card rounded-3xl p-6 shadow-luxury border border-flore-border">
+            <h2 className="font-amiri text-xl font-bold mb-4 flex items-center gap-2 text-flore-primary">
+              <MessageCircle className="h-5 w-5" /> ملاحظات التوصيل (اختياري)
+            </h2>
+            <textarea
+              value={form.notes}
+              onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
+              className="w-full rounded-xl border-2 border-flore-border bg-flore-bg p-3 focus:border-flore-primary focus:outline-none resize-none transition-colors"
+              rows={2} placeholder="مثال: يرجى الاتصال قبل الوصول..."
+            />
+          </section>
+
+          {/* الملخص وزر الإرسال */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-flore-primary text-white rounded-3xl p-6 shadow-luxury"
+          >
+            <div className="flex justify-between items-center mb-3 text-sm">
+              <span className="text-white/80">عدد العناصر</span>
+              <span className="font-bold text-base">{items.reduce((s, i) => s + i.quantity, 0)}</span>
+            </div>
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-white/80 text-sm">الإجمالي</span>
+              <span className="font-amiri text-3xl font-bold tracking-wide">{formatPrice(getTotal())}</span>
+            </div>
+            <p className="text-white/60 text-[11px] mb-6">
+              الأسعار النهائية تُحتسب وتُؤكَّد من السيرفر عند الإرسال
+            </p>
+            <Button
+              type="submit" disabled={loading} size="lg"
+              className="w-full bg-white text-flore-primary hover:bg-purple-50 transition-all font-bold text-base py-4 rounded-xl shadow-md"
+            >
+              {loading ? 'جاري تجهيز هديتك...' : 'أرسل هديتك الآن'}
+            </Button>
+          </motion.div>
+
+        </form>
       </div>
     </div>
   )

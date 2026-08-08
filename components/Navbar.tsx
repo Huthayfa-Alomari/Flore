@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ShoppingCart, User, Flower2 } from 'lucide-react'
 import { useCart } from '@/lib/store/cart-store'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
+import { DeliveryCitySelector } from '@/components/DeliveryCitySelector'
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -37,6 +38,11 @@ export function Navbar() {
             <Flower2 className="h-8 w-8 text-flore-primary transition-transform duration-300 group-hover:rotate-12" />
             <span className="font-amiri text-xl font-bold text-flore-primary tracking-wide">Floré</span>
           </Link>
+
+          {/* اختيار المدينة - يظهر فقط بالشاشات المتوسطة فأكبر */}
+          <div className="hidden md:block">
+            <DeliveryCitySelector />
+          </div>
 
           {/* روابط الشاشات الكبيرة */}
           <div className="hidden md:flex items-center gap-8">

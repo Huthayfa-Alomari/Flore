@@ -66,6 +66,13 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    const savedCity = localStorage.getItem('flore_delivery_city')
+    if (savedCity) {
+      setForm(prev => ({ ...prev, region: savedCity }))
+    }
+  }, [])
+
   if (!mounted) {
     return (
       <div className="min-h-screen bg-flore-bg flex items-center justify-center">
@@ -220,7 +227,7 @@ export default function CheckoutPage() {
         </button>
 
         <h1 className="font-amiri text-4xl font-bold text-flore-text-primary mb-3 text-center">
-          إتمام الطلب الفاخر
+          لحظات قليلة تفصلك عن إسعاد أحدهم
         </h1>
         <p className="text-center text-flore-text-secondary mb-8 text-sm">
           مراجعة آمنة وموثقة للطلب | جميع الأسعار بالدينار الأردني (JOD)
@@ -461,7 +468,7 @@ export default function CheckoutPage() {
               type="submit" disabled={loading} size="lg"
               className="w-full bg-white text-flore-primary hover:bg-purple-50 transition-all font-bold text-base py-4 rounded-xl shadow-md"
             >
-              {loading ? 'جاري توثيق وإرسال طلبك...' : 'تأكيد وإرسال الطلب الآمن'}
+              {loading ? 'جاري تجهيز هديتك...' : 'أرسل هديتك الآن'}
             </Button>
           </motion.div>
 

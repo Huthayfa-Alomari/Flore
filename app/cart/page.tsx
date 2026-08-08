@@ -32,20 +32,27 @@ export default function CartPage() {
   if (items.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-flore-bg px-4">
-        <div className="text-center">
-          <ShoppingBag className="h-20 w-20 mx-auto text-flore-primary/30 mb-6" />
-          <h1 className="font-amiri text-3xl font-bold text-flore-text-primary mb-4">
-            السلة فارغة
-          </h1>
-          <p className="text-flore-text-secondary mb-8">
-            اكتشف مجموعتنا الفاخرة واختر ما يناسبك
+        <div className="text-center max-w-sm">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-flore-primary/5 flex items-center justify-center">
+            <ShoppingBag className="h-10 w-10 text-flore-primary/40" />
+          </div>
+          <h1 className="font-amiri text-3xl font-bold text-flore-text-primary mb-3">لم تختر هديتك بعد</h1>
+          <p className="text-flore-text-secondary mb-8 leading-relaxed">
+            كل هدية تبدأ بزهرة واحدة — استكشف مجموعتنا أو صمّم باقة تعبّر عنك
           </p>
-          <Link href="/catalog">
-            <Button size="lg" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              تسوق الآن
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link href="/catalog">
+              <Button size="lg" className="gap-2 w-full">
+                <ArrowLeft className="h-4 w-4" />
+                تسوق الآن
+              </Button>
+            </Link>
+            <Link href="/atelier">
+              <Button size="lg" variant="outline" className="gap-2 w-full">
+                صمّم باقتك
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     )
