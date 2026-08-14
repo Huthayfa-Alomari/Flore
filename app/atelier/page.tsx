@@ -1348,16 +1348,16 @@ export default function AtelierPage() {
                     !isClickable
                   }
                   className={`flex items-center gap-2.5 whitespace-nowrap transition-all duration-300 ${!isClickable
-                      ? "opacity-30 cursor-not-allowed"
-                      : "cursor-pointer"
+                    ? "opacity-30 cursor-not-allowed"
+                    : "cursor-pointer"
                     }`}
                 >
                   <span
                     className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border-2 transition-all duration-300 ${isActive
-                        ? "border-flore-primary bg-flore-primary text-white"
-                        : isPast
-                          ? "border-flore-primary text-flore-primary"
-                          : "border-flore-border text-flore-text-secondary"
+                      ? "border-flore-primary bg-flore-primary text-white"
+                      : isPast
+                        ? "border-flore-primary text-flore-primary"
+                        : "border-flore-border text-flore-text-secondary"
                       }`}
                   >
                     {isPast ? (
@@ -1386,8 +1386,8 @@ export default function AtelierPage() {
 
                   <span
                     className={`text-sm font-medium hidden md:inline ${isActive
-                        ? "text-flore-text-primary font-bold"
-                        : "text-flore-text-secondary"
+                      ? "text-flore-text-primary font-bold"
+                      : "text-flore-text-secondary"
                       }`}
                   >
                     {step.label}
@@ -1503,9 +1503,9 @@ export default function AtelierPage() {
                             )
                           }
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border-2 whitespace-nowrap ${colorFilter ===
-                              cf.value
-                              ? "border-flore-primary bg-flore-primary/10 text-flore-primary"
-                              : "border-flore-border bg-flore-card text-flore-text-secondary hover:border-flore-primary/50"
+                            cf.value
+                            ? "border-flore-primary bg-flore-primary/10 text-flore-primary"
+                            : "border-flore-border bg-flore-card text-flore-text-secondary hover:border-flore-primary/50"
                             }`}
                         >
                           <span
@@ -1542,8 +1542,8 @@ export default function AtelierPage() {
                               flower.id
                             }
                             className={`group relative bg-flore-card rounded-2xl border-2 transition-all duration-300 overflow-hidden ${isSelected
-                                ? "border-flore-primary shadow-lg"
-                                : "border-flore-border hover:border-flore-primary/50 hover:shadow-md"
+                              ? "border-flore-primary shadow-lg"
+                              : "border-flore-border hover:border-flore-primary/50 hover:shadow-md"
                               }`}
                           >
                             <div className="relative h-32 bg-gradient-to-b from-flore-bg to-flore-card overflow-hidden">
@@ -1606,8 +1606,8 @@ export default function AtelierPage() {
 
                                 <span
                                   className={`font-bold text-base px-3 transition-all ${isSelected
-                                      ? "text-flore-primary scale-110"
-                                      : "text-flore-text-secondary"
+                                    ? "text-flore-primary scale-110"
+                                    : "text-flore-text-secondary"
                                     }`}
                                 >
                                   {qty}
@@ -1718,8 +1718,8 @@ export default function AtelierPage() {
                               item.id
                             }
                             className={`rounded-2xl border-2 overflow-hidden ${qty > 0
-                                ? "border-flore-primary shadow-lg"
-                                : "border-flore-border"
+                              ? "border-flore-primary shadow-lg"
+                              : "border-flore-border"
                               } bg-flore-card`}
                           >
                             <div className="relative h-24 bg-flore-bg">
@@ -1859,8 +1859,8 @@ export default function AtelierPage() {
                               )
                             }
                             className={`group relative rounded-2xl border-2 p-4 transition-all duration-300 text-center ${isSelected
-                                ? "border-flore-primary bg-flore-primary/5 shadow-lg"
-                                : "border-flore-border bg-flore-card hover:border-flore-primary/50 hover:shadow-md"
+                              ? "border-flore-primary bg-flore-primary/5 shadow-lg"
+                              : "border-flore-border bg-flore-card hover:border-flore-primary/50 hover:shadow-md"
                               }`}
                           >
                             <div className="relative w-16 h-16 mx-auto mb-2 rounded-xl overflow-hidden bg-flore-bg flex items-center justify-center">
@@ -2008,8 +2008,8 @@ export default function AtelierPage() {
                                 )
                               }
                               className={`text-right rounded-2xl border-2 p-4 transition-all ${isSelected
-                                  ? "border-flore-primary bg-flore-primary/5 shadow-lg"
-                                  : "border-flore-border bg-flore-card hover:border-flore-primary/50"
+                                ? "border-flore-primary bg-flore-primary/5 shadow-lg"
+                                : "border-flore-border bg-flore-card hover:border-flore-primary/50"
                                 }`}
                             >
                               <p className="font-bold text-flore-text-primary mb-1">
@@ -2524,11 +2524,11 @@ export default function AtelierPage() {
                     added
                   }
                   className={`w-full py-3.5 rounded-xl font-bold text-base transition-all duration-300 flex items-center justify-center gap-2 ${added
-                      ? "bg-green-500 text-white"
-                      : totalFlowers ===
-                        0
-                        ? "bg-flore-border text-flore-text-secondary cursor-not-allowed"
-                        : "bg-flore-primary text-white hover:brightness-110 shadow-lg active:scale-[0.98]"
+                    ? "bg-green-500 text-white"
+                    : totalFlowers ===
+                      0
+                      ? "bg-flore-border text-flore-text-secondary cursor-not-allowed"
+                      : "bg-flore-primary text-white hover:brightness-110 shadow-lg active:scale-[0.98]"
                     }`}
                 >
                   {added ? (

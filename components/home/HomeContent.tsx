@@ -447,8 +447,8 @@ export default function HomeContent({
                             viewport={{ once: true }}
                             transition={{ delay: i * 0.1 }}
                             className={`group relative overflow-hidden rounded-2xl ${i === 0 || i === 3
-                                    ? "aspect-[3/4]"
-                                    : "aspect-square"
+                                ? "aspect-[3/4]"
+                                : "aspect-square"
                                 }`}
                         >
                             <Image
