@@ -7,6 +7,7 @@ Premium Arabic-first luxury flower e-commerce web application built with Next.js
 - **Premium Design**: Light Luxury Minimal aesthetic with RTL Arabic support
 - **Full E-commerce**: Product catalog, cart, checkout (WhatsApp, CliQ, Cash)
 - **3D Atelier**: Build custom bouquets with Three.js
+- **Photorealistic AI Atelier**: Generate a realistic preview of the selected flowers, colors, size, and container
 - **AR Experience**: WebXR product preview with Google Model Viewer
 - **Live Tracking**: Real-time order tracking with Supabase Realtime
 - **AI Concierge**: Smart assistant for flower recommendations
@@ -37,17 +38,20 @@ Premium Arabic-first luxury flower e-commerce web application built with Next.js
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/flore-luxury.git
 cd flore-luxury
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Set up environment variables:
+
 ```bash
 cp .env.example .env.local
 ```
@@ -60,6 +64,7 @@ Fill in your Supabase credentials and other API keys.
    - Run the seed data
 
 5. Run the development server:
+
 ```bash
 npm run dev
 ```
@@ -105,15 +110,26 @@ npm run test:ui
 
 ## 📝 Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
-| `OPENAI_API_KEY` | OpenAI API key (optional) |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps API key (optional) |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Web Push VAPID public key |
-| `VAPID_PRIVATE_KEY` | Web Push VAPID private key |
+| Variable                          | Description                                                        |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`        | Supabase project URL                                               |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anon key                                                  |
+| `SUPABASE_SERVICE_ROLE_KEY`       | Supabase service role key                                          |
+| `OPENAI_API_KEY`                  | OpenAI API key (optional)                                          |
+| `CLOUDFLARE_ACCOUNT_ID`           | Cloudflare account ID for Workers AI image previews (recommended)  |
+| `CLOUDFLARE_API_TOKEN`            | Server-only Workers AI token (recommended)                         |
+| `ATELIER_AI_DAILY_LIMIT`          | Successful previews allowed per user/IP in 24 hours (default: `5`) |
+| `AI_RATE_LIMIT_SECRET`            | Long server-only secret used to anonymize usage identifiers        |
+| `ATELIER_AI_PUBLIC_FALLBACK`      | Keep the no-key Pollinations fallback enabled (`true` by default)  |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps API key (optional)                                     |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`    | Web Push VAPID public key                                          |
+| `VAPID_PRIVATE_KEY`               | Web Push VAPID private key                                         |
+
+### Photorealistic Atelier setup
+
+The Atelier uses Cloudflare Workers AI with `FLUX.2 Klein 4B` as its primary image model and automatically falls back to the existing no-key Pollinations provider. Add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to the server or Vercel environment for the highest-quality path; never expose the token with a `NEXT_PUBLIC_` prefix.
+
+Generated previews are normalized to JPEG and saved in the public Supabase Storage bucket `atelier-previews`. Successful usage is counted in `ai_generation_logs` using an anonymized user/IP identifier, so the existing bucket, table, and `SUPABASE_SERVICE_ROLE_KEY` must be available.
 
 ## 🎨 Design System
 

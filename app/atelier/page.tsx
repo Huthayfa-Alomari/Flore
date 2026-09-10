@@ -62,6 +62,15 @@ type Step =
   | "size"
   | "message"
 
+type AiPreviewResponse = {
+  configured?: boolean
+  imageUrl?: string
+  remaining?: number
+  limit?: number
+  model?: string
+  error?: string
+}
+
 // ─────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────
@@ -363,6 +372,55 @@ export default function AtelierPage() {
   const [aiRemaining, setAiRemaining] =
     useState<number | null>(null)
 
+  const [aiError, setAiError] =
+    useState<string | null>(null)
+
+  const [aiModel, setAiModel] =
+    useState<string | null>(null)
+
+  const [aiAvailable, setAiAvailable] =
+    useState<boolean | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadAiStatus() {
+      try {
+        const response = await fetch(
+          "/api/atelier/generate-preview",
+          {
+            method: "GET",
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        )
+        const data =
+          (await response.json()) as AiPreviewResponse
+
+        if (typeof data.remaining === "number") {
+          setAiRemaining(data.remaining)
+        }
+
+        setAiAvailable(
+          response.ok && data.configured !== false
+        )
+      } catch (statusError) {
+        if (
+          statusError instanceof DOMException &&
+          statusError.name === "AbortError"
+        ) {
+          return
+        }
+
+        setAiAvailable(null)
+      }
+    }
+
+    loadAiStatus()
+
+    return () => controller.abort()
+  }, [])
+
   // ───────────────────────────────────────────────────────────
   // Load Data
   // ───────────────────────────────────────────────────────────
@@ -594,6 +652,8 @@ export default function AtelierPage() {
       })
 
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
     },
     []
   )
@@ -624,6 +684,8 @@ export default function AtelierPage() {
       })
 
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
     },
     []
   )
@@ -741,6 +803,8 @@ export default function AtelierPage() {
       setSelectedFlowers(next)
       setShowPresets(false)
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
       setActiveStep("flowers")
     },
     [flowers]
@@ -771,7 +835,8 @@ export default function AtelierPage() {
     setActiveStep("flowers")
     setShowPresets(true)
     setAiImageUrl(null)
-    setAiRemaining(null)
+    setAiError(null)
+    setAiModel(null)
     setAdded(false)
     setColorFilter("all")
   }, [bouquetSizes])
@@ -783,8 +848,8 @@ export default function AtelierPage() {
   const handleGenerateAiPreview =
     useCallback(async () => {
       if (totalFlowers === 0) {
-        window.alert(
-          "الرجاء اختيار زهور أولاً"
+        setAiError(
+          "اختر زهرة واحدة على الأقل قبل إنشاء المعاينة."
         )
         return
       }
@@ -793,15 +858,29 @@ export default function AtelierPage() {
         return
       }
 
+      if (aiAvailable === false) {
+        setAiError(
+          "خدمة المعاينة غير متاحة حالياً. تحقق من إعدادات السيرفر."
+        )
+        return
+      }
+
       if (aiRemaining === 0) {
-        window.alert(
+        setAiError(
           "انتهت محاولات المعاينة المجانية لهذا اليوم."
         )
         return
       }
 
       setIsGeneratingAi(true)
-      setAiImageUrl(null)
+      setAiError(null)
+
+      const controller =
+        new AbortController()
+      const timeout = window.setTimeout(
+        () => controller.abort(),
+        70_000
+      )
 
       try {
         const res = await fetch(
@@ -832,15 +911,19 @@ export default function AtelierPage() {
                 selectedContainer,
 
               sizeKey:
-                selectedSize,
+                selectedSize ||
+                undefined,
             }),
+            signal:
+              controller.signal,
           }
         )
 
-        const data = await res.json()
+        const data =
+          (await res.json()) as AiPreviewResponse
 
         if (!res.ok) {
-          window.alert(
+          setAiError(
             data?.error ||
             "تعذر توليد الصورة حالياً"
           )
@@ -864,6 +947,10 @@ export default function AtelierPage() {
         }
 
         setAiImageUrl(data.imageUrl)
+        setAiModel(
+          data.model || null
+        )
+        setAiAvailable(true)
 
         if (
           typeof data?.remaining ===
@@ -879,15 +966,25 @@ export default function AtelierPage() {
           err
         )
 
-        window.alert(
-          "تعذر توليد الصورة حالياً، يرجى المحاولة مرة أخرى."
+        const timedOut =
+          err instanceof DOMException &&
+          err.name === "AbortError"
+
+        setAiError(
+          timedOut
+            ? "استغرق إنشاء الصورة وقتاً أطول من المتوقع. حاول مرة أخرى."
+            : "تعذر الاتصال بخدمة الصور حالياً. حاول مرة أخرى."
         )
       } finally {
+        window.clearTimeout(
+          timeout
+        )
         setIsGeneratingAi(false)
       }
     }, [
       totalFlowers,
       isGeneratingAi,
+      aiAvailable,
       aiRemaining,
       selectedFlowers,
       selectedGreenery,
@@ -908,6 +1005,8 @@ export default function AtelierPage() {
       )
 
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
     },
     []
   )
@@ -920,6 +1019,8 @@ export default function AtelierPage() {
     (sizeKey: string) => {
       setSelectedSize(sizeKey)
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
     },
     []
   )
@@ -2207,14 +2308,36 @@ export default function AtelierPage() {
                     0 &&
                     !aiImageUrl &&
                     !isGeneratingAi && (
-                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-flore-bg/80 backdrop-blur-sm p-4 text-center">
-                        <div className="text-3xl mb-2">
-                          🪄
+                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gradient-to-b from-flore-bg/90 via-flore-bg/95 to-flore-card/95 backdrop-blur-md p-5 text-center">
+                        <div className="w-12 h-12 rounded-2xl bg-flore-primary text-white flex items-center justify-center mb-3 shadow-lg shadow-flore-primary/20">
+                          <svg
+                            className="w-6 h-6"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.8}
+                              d="M12 3l1.3 3.7L17 8l-3.7 1.3L12 13l-1.3-3.7L7 8l3.7-1.3L12 3Zm6 9 .8 2.2L21 15l-2.2.8L18 18l-.8-2.2L15 15l2.2-.8L18 12ZM6 13l1 2.8L10 17l-3 1.2L6 21l-1-2.8L2 17l3-1.2L6 13Z"
+                            />
+                          </svg>
                         </div>
 
-                        <p className="text-flore-text-primary font-bold text-sm mb-3">
-                          هل تريد رؤية شكل
-                          باقتك فعلياً؟
+                        <span className="text-[10px] tracking-[0.2em] uppercase text-flore-primary font-bold mb-2">
+                          FLORÉ AI
+                        </span>
+
+                        <p className="text-flore-text-primary font-bold text-base mb-1">
+                          شاهد باقتك بصورة واقعية
+                        </p>
+
+                        <p className="text-flore-text-secondary text-xs leading-relaxed mb-4 max-w-[220px]">
+                          نحول الزهور والألوان
+                          والحجم الذي اخترته إلى
+                          صورة استوديو فاخرة.
                         </p>
 
                         <button
@@ -2223,16 +2346,23 @@ export default function AtelierPage() {
                           }
                           disabled={
                             aiRemaining ===
-                            0
+                            0 ||
+                            aiAvailable ===
+                            false
                           }
-                          className="bg-flore-primary text-white px-4 py-2 rounded-xl font-bold text-sm hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full bg-flore-primary text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:brightness-110 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          توليد معاينة واقعية
-                          (AI) 📸
+                          {aiAvailable ===
+                            false
+                            ? "الخدمة غير متاحة حالياً"
+                            : "إنشاء معاينة واقعية"}
                         </button>
 
                         <span className="text-xs text-flore-text-secondary mt-2">
-                          {aiRemaining ===
+                          {aiAvailable ===
+                            false
+                            ? "تحقق من إعدادات الخدمة"
+                            : aiRemaining ===
                             null
                             ? "حتى 5 محاولات يومياً"
                             : aiRemaining >
@@ -2245,31 +2375,45 @@ export default function AtelierPage() {
 
                   {/* AI Loading */}
                   {isGeneratingAi && (
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-flore-bg/90 backdrop-blur-sm">
+                    <div
+                      className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-flore-bg/90 backdrop-blur-md p-5"
+                      aria-live="polite"
+                    >
                       <div className="w-12 h-12 rounded-full border-4 border-flore-primary/20 border-t-flore-primary animate-spin mb-3" />
 
                       <p className="text-flore-text-primary font-bold text-sm text-center px-4">
-                        جاري تصميم باقتك
-                        بالذكاء الاصطناعي...
+                        نصنع المعاينة الواقعية
+                        لباقتك
                       </p>
 
-                      <p className="text-flore-text-secondary text-xs mt-1">
-                        قد يستغرق ذلك
-                        15 ثانية
+                      <p className="text-flore-text-secondary text-xs mt-1 text-center leading-relaxed">
+                        نضبط أنواع الزهور والألوان
+                        والإضاءة، وقد يستغرق ذلك
+                        أقل من دقيقة.
                       </p>
                     </div>
                   )}
 
                   {/* AI Image */}
                   {aiImageUrl ? (
-                    <Image
-                      src={
-                        aiImageUrl
-                      }
-                      alt="معاينة الباقة بالذكاء الاصطناعي"
-                      fill
-                      className="object-cover transition-transform duration-700 hover:scale-105"
-                    />
+                    <>
+                      <Image
+                        src={
+                          aiImageUrl
+                        }
+                        alt="معاينة فوتوغرافية للباقة بالذكاء الاصطناعي"
+                        fill
+                        sizes="(max-width: 1024px) 280px, 20vw"
+                        className="object-cover transition-transform duration-700 hover:scale-105"
+                      />
+
+                      <div className="absolute bottom-3 left-3 z-10 rounded-full bg-black/55 backdrop-blur-md text-white px-2.5 py-1 text-[10px] tracking-wide">
+                        FLORÉ AI
+                        {aiModel
+                          ? ` · ${aiModel}`
+                          : ""}
+                      </div>
+                    </>
                   ) : (
                     !isGeneratingAi && (
                       <>
@@ -2400,15 +2544,34 @@ export default function AtelierPage() {
                     disabled={
                       aiRemaining ===
                       0 ||
-                      isGeneratingAi
+                      isGeneratingAi ||
+                      aiAvailable ===
+                      false
                     }
-                    className="w-full mb-3 text-sm text-flore-primary bg-flore-primary/10 py-2 rounded-lg font-bold hover:bg-flore-primary/20 transition disabled:opacity-50"
+                    className="w-full mb-2 text-sm text-flore-primary bg-flore-primary/10 py-2.5 rounded-xl font-bold hover:bg-flore-primary/20 transition disabled:opacity-50"
                   >
                     {aiRemaining ===
                       0
                       ? "انتهت المحاولات"
-                      : "🔁 إعادة التوليد"}
+                      : "إنشاء نسخة واقعية جديدة"}
                   </button>
+                )}
+
+                {aiImageUrl && (
+                  <p className="text-[11px] text-flore-text-secondary text-center leading-relaxed mb-3">
+                    المعاينة تقريبية، وقد تختلف
+                    التفاصيل الطبيعية قليلاً عند
+                    تنسيق الباقة الفعلية.
+                  </p>
+                )}
+
+                {aiError && (
+                  <div
+                    className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs leading-relaxed text-red-700 text-center"
+                    role="alert"
+                  >
+                    {aiError}
+                  </div>
                 )}
 
                 {/* Message Preview */}
