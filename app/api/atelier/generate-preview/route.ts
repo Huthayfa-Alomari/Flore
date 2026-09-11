@@ -18,7 +18,7 @@ export const maxDuration = 60
 const PRIMARY_MODEL = '@cf/black-forest-labs/flux-2-klein-4b'
 const FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-schnell'
 const PREVIEW_BUCKET = 'atelier-previews'
-const PROMPT_VERSION = 'atelier-v4-provider-references'
+const PROMPT_VERSION = 'atelier-v5-strict-provider-references'
 const MAX_REFERENCE_BYTES = 6 * 1024 * 1024
 const REFERENCE_SIZE = 448
 
@@ -294,22 +294,34 @@ function publicReferencesForSelection(
   selection: BouquetSelection,
   previousImageUrl: string | undefined
 ) {
-  const dominantFlower = [...selection.flowers]
+  const flowerReferences = [...selection.flowers]
     .sort((a, b) => b.qty - a.qty)
     .map((item) => trustedReferenceUrl(item.image))
-    .find((url): url is string => !!url)
+    .filter((url): url is string => !!url)
+    .filter((url, index, urls) => urls.indexOf(url) === index)
+    .slice(0, previousImageUrl ? 1 : 2)
   const greenery = selection.greenery
     .map((item) => trustedReferenceUrl(item.image))
     .find((url): url is string => !!url)
   const container = trustedReferenceUrl(selection.container?.image)
   const previous = trustedPreviousPreviewUrl(previousImageUrl)
 
-  const candidates: Array<PublicReference | null> = [
-    dominantFlower ? { url: dominantFlower, purpose: 'flowers' } : null,
-    greenery ? { url: greenery, purpose: 'greenery' } : null,
-    container ? { url: container, purpose: 'container' } : null,
-    previous ? { url: previous, purpose: 'previous' } : null,
-  ]
+  const candidates: Array<PublicReference | null> = previous
+    ? [
+        { url: previous, purpose: 'previous' },
+        flowerReferences[0]
+          ? { url: flowerReferences[0], purpose: 'flowers' }
+          : null,
+        greenery ? { url: greenery, purpose: 'greenery' } : null,
+        container ? { url: container, purpose: 'container' } : null,
+      ]
+    : [
+        ...flowerReferences.map(
+          (url): PublicReference => ({ url, purpose: 'flowers' })
+        ),
+        greenery ? { url: greenery, purpose: 'greenery' } : null,
+        container ? { url: container, purpose: 'container' } : null,
+      ]
 
   const seen = new Set<string>()
   return candidates
@@ -722,6 +734,7 @@ async function generateWithPollinations(
 
 async function generateImage(
   prompt: string,
+  publicFallbackPrompt: string,
   seed: number,
   references: PreparedReference[],
   publicReferences: PublicReference[]
@@ -795,7 +808,7 @@ async function generateImage(
 
   if (allowPublicFallback) {
     return generateWithPollinations(
-      prompt,
+      publicFallbackPrompt,
       seed,
       remainingTime(),
       publicReferences
@@ -806,23 +819,55 @@ async function generateImage(
   throw new AiConfigurationError()
 }
 
-function colorDescription(color: string | null) {
-  const cleaned = cleanPromptText(color, 30).toLowerCase()
-  const knownColors: Record<string, string> = {
-    '#c41e3a': 'natural crimson red',
-    '#e11d48': 'natural deep red',
-    '#ffffff': 'clean ivory white',
-    '#f8fafc': 'clean ivory white',
-    '#f7c6d9': 'soft blush pink',
-    '#ff6b9d': 'soft natural pink',
-    '#ffc72c': 'warm sunflower yellow',
-    '#fbbf24': 'warm sunflower yellow',
-    '#b497d6': 'soft lavender purple',
-    '#a855f7': 'rich natural purple',
+function colorFamily(name: string, color: string | null) {
+  const normalizedName = name.normalize('NFKC').toLowerCase()
+  const namedColors: Array<[RegExp, string]> = [
+    [/\b(red)\b|(?:أحمر|احمر)/u, 'red'],
+    [/\b(pink|blush)\b|(?:وردي|زهري)/u, 'pink'],
+    [/\b(white|ivory)\b|(?:أبيض|ابيض)/u, 'white'],
+    [/\b(yellow)\b|(?:أصفر|اصفر)/u, 'yellow'],
+    [/\b(orange)\b|برتقالي/u, 'orange'],
+    [/\b(purple|violet|lavender)\b|بنفسجي/u, 'purple'],
+  ]
+
+  for (const [pattern, family] of namedColors) {
+    if (pattern.test(normalizedName)) return family
   }
 
-  if (!cleaned) return 'its natural botanical color'
-  return knownColors[cleaned] || `the natural color reference ${cleaned}`
+  const cleaned = cleanPromptText(color, 30).toLowerCase()
+  const knownColors: Record<string, string> = {
+    '#c41e3a': 'red',
+    '#e11d48': 'red',
+    '#ffffff': 'white',
+    '#f8fafc': 'white',
+    '#f7c6d9': 'pink',
+    '#ff6b9d': 'pink',
+    '#ffc72c': 'yellow',
+    '#fbbf24': 'yellow',
+    '#b497d6': 'purple',
+    '#a855f7': 'purple',
+  }
+
+  return knownColors[cleaned] || null
+}
+
+function colorDescription(name: string, color: string | null) {
+  const family = colorFamily(name, color)
+  const descriptions: Record<string, string> = {
+    red: 'natural crimson red',
+    pink: 'natural hot pink',
+    white: 'clean ivory white',
+    yellow: 'warm sunflower yellow',
+    orange: 'natural warm orange',
+    purple: 'natural rich purple',
+  }
+
+  if (family) return descriptions[family]
+
+  const cleaned = cleanPromptText(color, 30).toLowerCase()
+  return cleaned
+    ? `the natural color reference ${cleaned}`
+    : 'its natural botanical color'
 }
 
 function containerDescription(container: ContainerRow | null) {
@@ -866,6 +911,7 @@ function buildBouquetPrompt(
       const name =
         cleanPromptText(flower.name || flower.name_ar, 80) || 'flower'
       return `${flower.qty} stems of ${name} in ${colorDescription(
+        `${flower.name} ${flower.name_ar || ''}`,
         flower.color
       )}, approximately ${share}% of the visible flower heads`
     })
@@ -932,6 +978,110 @@ function buildBouquetPrompt(
   ]
     .join(' ')
     .slice(0, 2040)
+}
+
+function buildPollinationsPrompt(
+  selection: BouquetSelection,
+  references: PublicReference[]
+) {
+  const selectedStems = selection.flowers.reduce(
+    (sum, flower) => sum + flower.qty,
+    0
+  )
+  const flowerRecipe = selection.flowers
+    .map((flower) => {
+      const name =
+        cleanPromptText(flower.name || flower.name_ar, 70) || 'flower'
+      return `${flower.qty} ${colorDescription(
+        `${flower.name} ${flower.name_ar || ''}`,
+        flower.color
+      )} ${name} stems`
+    })
+    .join('; ')
+
+  const greeneryRecipe = selection.greenery.length
+    ? selection.greenery
+        .map((item) => {
+          const name = cleanPromptText(item.name || item.name_ar, 60)
+          return `${item.qty} ${name || 'greenery'} stems`
+        })
+        .join('; ')
+    : 'none'
+
+  const selectedNames = selection.flowers
+    .map((flower) => `${flower.name} ${flower.name_ar || ''}`.toLowerCase())
+    .join(' ')
+  const forbiddenSpecies = [
+    { tokens: ['rose'], label: 'roses' },
+    { tokens: ['peony'], label: 'peonies' },
+    { tokens: ['lily', 'lilium'], label: 'lilies' },
+    { tokens: ['tulip'], label: 'tulips' },
+    { tokens: ['sunflower'], label: 'sunflowers' },
+    { tokens: ['orchid'], label: 'orchids' },
+    { tokens: ['carnation'], label: 'carnations' },
+    { tokens: ['chrysanthemum', 'santini'], label: 'chrysanthemums' },
+    { tokens: ['gerbera'], label: 'gerbera daisies' },
+    { tokens: ['calla'], label: 'calla lilies' },
+  ]
+    .filter(({ tokens }) => !tokens.some((token) => selectedNames.includes(token)))
+    .map(({ label }) => label)
+    .slice(0, 6)
+
+  const selectedColors = new Set(
+    selection.flowers
+      .map((flower) =>
+        colorFamily(`${flower.name} ${flower.name_ar || ''}`, flower.color)
+      )
+      .filter((family): family is string => !!family)
+  )
+  const forbiddenColors = ['red', 'pink', 'white', 'yellow', 'orange', 'purple']
+    .filter((family) => !selectedColors.has(family))
+    .map((family) => `${family} flowers`)
+    .slice(0, 4)
+
+  const referenceLegend = references
+    .map((reference, index) => {
+      const labels: Record<ReferencePurpose, string> = {
+        flowers: 'flower species and petal color',
+        greenery: 'greenery leaf identity',
+        container: 'exact container material and silhouette',
+        previous: 'previous bouquet composition to preserve',
+      }
+      return `reference ${index + 1} = ${labels[reference.purpose]}`
+    })
+    .join('; ')
+
+  const greeneryDirection =
+    selection.greenery.length === 0
+      ? 'Do not add any decorative greenery or filler flowers.'
+      : selection.greeneryPreference === 'less'
+        ? 'Keep the selected greenery sparse and restrained.'
+        : selection.greeneryPreference === 'more'
+          ? 'Use fuller selected greenery without hiding flower heads.'
+          : 'Use the selected greenery in a balanced restrained amount.'
+  const spacingDirection =
+    selection.spacingPreference === 'compact'
+      ? 'Keep flower heads close in a compact florist silhouette.'
+      : selection.spacingPreference === 'airy'
+        ? 'Use a natural airy florist silhouette with believable spacing.'
+        : 'Use balanced professional florist spacing.'
+  const exclusions = [...forbiddenSpecies, ...forbiddenColors]
+
+  return [
+    'Photorealistic luxury florist catalog product photo of exactly ONE bouquet.',
+    `Required flower recipe: ${flowerRecipe}. Preserve these exact species, colors, and their ${selectedStems}-stem relative ratio.`,
+    `Greenery: ${greeneryRecipe}. ${greeneryDirection}`,
+    `${spacingDirection} Bouquet scale: ${bouquetScale(selection.size, selectedStems)}.`,
+    `Presentation: ${containerDescription(selection.container)}.`,
+    referenceLegend ? `Image references: ${referenceLegend}.` : '',
+    'Use ONLY the listed flowers and colors.',
+    exclusions.length ? `Absolutely do not add ${exclusions.join(', ')}.` : '',
+    'Centered complete bouquet, true botanical anatomy, realistic petals and stems, natural imperfections, soft diffused window light, warm ivory studio background, square composition.',
+    'No hands, people, text, letters, price tags, logos, watermark, duplicate bouquet, extra container, illustration, CGI, or plastic-looking petals.',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .slice(0, 1_600)
 }
 
 function providerConfigured() {
@@ -1293,12 +1443,17 @@ export async function POST(request: NextRequest) {
     selection,
     cloudflareConfigured() ? references : publicReferences
   )
+  const publicFallbackPrompt = buildPollinationsPrompt(
+    selection,
+    publicReferences
+  )
   const seed = Math.floor(Math.random() * 2_147_483_647)
   let generated: GeneratedImage
 
   try {
     generated = await generateImage(
       prompt,
+      publicFallbackPrompt,
       seed,
       references,
       publicReferences
