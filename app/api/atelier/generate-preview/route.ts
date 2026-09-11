@@ -18,7 +18,7 @@ export const maxDuration = 60
 const PRIMARY_MODEL = '@cf/black-forest-labs/flux-2-klein-4b'
 const FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-schnell'
 const PREVIEW_BUCKET = 'atelier-previews'
-const PROMPT_VERSION = 'atelier-v3-references'
+const PROMPT_VERSION = 'atelier-v4-provider-references'
 const MAX_REFERENCE_BYTES = 6 * 1024 * 1024
 const REFERENCE_SIZE = 448
 
@@ -99,9 +99,16 @@ type GeneratedImage = {
   referencesUsed: number
 }
 
+type ReferencePurpose = 'flowers' | 'greenery' | 'container' | 'previous'
+
 type PreparedReference = {
   buffer: Buffer
-  purpose: 'flowers' | 'greenery' | 'container' | 'previous'
+  purpose: ReferencePurpose
+}
+
+type PublicReference = {
+  url: string
+  purpose: ReferencePurpose
 }
 
 class AiProviderError extends Error {
@@ -283,6 +290,37 @@ function trustedPreviousPreviewUrl(value: string | undefined) {
     : null
 }
 
+function publicReferencesForSelection(
+  selection: BouquetSelection,
+  previousImageUrl: string | undefined
+) {
+  const dominantFlower = [...selection.flowers]
+    .sort((a, b) => b.qty - a.qty)
+    .map((item) => trustedReferenceUrl(item.image))
+    .find((url): url is string => !!url)
+  const greenery = selection.greenery
+    .map((item) => trustedReferenceUrl(item.image))
+    .find((url): url is string => !!url)
+  const container = trustedReferenceUrl(selection.container?.image)
+  const previous = trustedPreviousPreviewUrl(previousImageUrl)
+
+  const candidates: Array<PublicReference | null> = [
+    dominantFlower ? { url: dominantFlower, purpose: 'flowers' } : null,
+    greenery ? { url: greenery, purpose: 'greenery' } : null,
+    container ? { url: container, purpose: 'container' } : null,
+    previous ? { url: previous, purpose: 'previous' } : null,
+  ]
+
+  const seen = new Set<string>()
+  return candidates
+    .filter((reference): reference is PublicReference => {
+      if (!reference || seen.has(reference.url)) return false
+      seen.add(reference.url)
+      return true
+    })
+    .slice(0, 4)
+}
+
 async function downloadReferenceImage(value: string) {
   const trusted = trustedReferenceUrl(value)
   if (!trusted) return null
@@ -428,10 +466,17 @@ async function prepareReferences(
   return references.slice(0, 4)
 }
 
-function selectionCacheHash(selection: BouquetSelection) {
+function selectionCacheHash(
+  selection: BouquetSelection,
+  publicReferences: PublicReference[]
+) {
   const stableSelection = {
     version: PROMPT_VERSION,
-    provider: cloudflareConfigured() ? PRIMARY_MODEL : 'pollinations',
+    provider: cloudflareConfigured()
+      ? PRIMARY_MODEL
+      : publicReferences.length > 0
+        ? 'pollinations-gptimage-references'
+        : 'pollinations-flux',
     flowers: [...selection.flowers]
       .sort((a, b) => a.id.localeCompare(b.id))
       .map(({ id, qty, name, color, image }) => ({
@@ -612,14 +657,38 @@ async function generateWithFlux1(
 async function generateWithPollinations(
   prompt: string,
   seed: number,
-  timeoutMs: number
+  timeoutMs: number,
+  references: PublicReference[]
 ): Promise<GeneratedImage> {
+  const referenceUrls = references.map((reference) => reference.url)
+  const model = referenceUrls.length > 0 ? 'gptimage' : 'flux'
+  const imageQuery = referenceUrls.length
+    ? `&image=${referenceUrls.map(encodeURIComponent).join(',')}`
+    : ''
+  const referer = (() => {
+    try {
+      return new URL(
+        process.env.NEXT_PUBLIC_APP_URL || 'https://flore.jo'
+      ).origin
+    } catch {
+      return 'https://flore.jo'
+    }
+  })()
   const url =
-    `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
-    `?width=1024&height=1024&seed=${seed}&nologo=true&enhance=true`
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(
+      prompt.slice(0, 1_600)
+    )}/?model=${model}` +
+    `${imageQuery}&width=1024&height=1024&seed=${seed}` +
+    '&nologo=true&enhance=true&referer=flore-atelier'
   const response = await fetchWithTimeout(
     url,
-    { headers: { Accept: 'image/*' } },
+    {
+      headers: {
+        Accept: 'image/*',
+        Referer: referer,
+        'User-Agent': 'FLORE-Atelier/1.0',
+      },
+    },
     timeoutMs
   )
   const contentType = response.headers.get('content-type') || ''
@@ -641,13 +710,21 @@ async function generateWithPollinations(
     throw new AiProviderError('The provider returned an invalid image', 502)
   }
 
-  return { buffer, model: 'Pollinations fallback', referencesUsed: 0 }
+  return {
+    buffer,
+    model:
+      referenceUrls.length > 0
+        ? 'Pollinations reference fallback'
+        : 'Pollinations fallback',
+    referencesUsed: referenceUrls.length,
+  }
 }
 
 async function generateImage(
   prompt: string,
   seed: number,
-  references: PreparedReference[]
+  references: PreparedReference[],
+  publicReferences: PublicReference[]
 ) {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
   const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim()
@@ -717,7 +794,12 @@ async function generateImage(
   }
 
   if (allowPublicFallback) {
-    return generateWithPollinations(prompt, seed, remainingTime())
+    return generateWithPollinations(
+      prompt,
+      seed,
+      remainingTime(),
+      publicReferences
+    )
   }
 
   if (lastCloudflareError) throw lastCloudflareError
@@ -772,7 +854,7 @@ function bouquetScale(size: SizeRow | null, selectedStems: number) {
 
 function buildBouquetPrompt(
   selection: BouquetSelection,
-  references: PreparedReference[]
+  references: Array<{ purpose: ReferencePurpose }>
 ) {
   const selectedStems = selection.flowers.reduce(
     (sum, flower) => sum + flower.qty,
@@ -1102,7 +1184,11 @@ export async function POST(request: NextRequest) {
     spacingPreference,
   }
 
-  const cacheHash = selectionCacheHash(selection)
+  const publicReferences = publicReferencesForSelection(
+    selection,
+    regenerate ? previousImageUrl : undefined
+  )
+  const cacheHash = selectionCacheHash(selection, publicReferences)
 
   if (!regenerate) {
     const cachedPath = await findCachedPreview(serviceClient, cacheHash)
@@ -1132,11 +1218,13 @@ export async function POST(request: NextRequest) {
           imageUrl: publicPreviewUrl(serviceClient, cachedPath),
           model: cloudflareConfigured()
             ? 'FLUX.2 Klein 4B'
-            : 'Pollinations fallback',
+            : publicReferences.length > 0
+              ? 'Pollinations reference fallback'
+              : 'Pollinations fallback',
           remaining,
           limit,
           cached: true,
-          referencesUsed: 0,
+          referencesUsed: publicReferences.length,
         },
         {
           headers: {
@@ -1201,12 +1289,20 @@ export async function POST(request: NextRequest) {
     console.warn('[atelier-ai] reference preparation failed', error)
   }
 
-  const prompt = buildBouquetPrompt(selection, references)
+  const prompt = buildBouquetPrompt(
+    selection,
+    cloudflareConfigured() ? references : publicReferences
+  )
   const seed = Math.floor(Math.random() * 2_147_483_647)
   let generated: GeneratedImage
 
   try {
-    generated = await generateImage(prompt, seed, references)
+    generated = await generateImage(
+      prompt,
+      seed,
+      references,
+      publicReferences
+    )
   } catch (error) {
     console.error('[atelier-ai] generation failed', error)
     const userError = userFacingProviderError(error)

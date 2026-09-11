@@ -120,14 +120,16 @@ npm run test:ui
 | `CLOUDFLARE_API_TOKEN`            | Server-only Workers AI token (recommended)                         |
 | `ATELIER_AI_DAILY_LIMIT`          | Successful previews allowed per user/IP in 24 hours (default: `5`) |
 | `AI_RATE_LIMIT_SECRET`            | Long server-only secret used to anonymize usage identifiers        |
-| `ATELIER_AI_PUBLIC_FALLBACK`      | Keep the no-key Pollinations fallback enabled (`true` by default)  |
+| `ATELIER_AI_PUBLIC_FALLBACK`      | Enable the best-effort no-key Pollinations fallback (`true` by default) |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps API key (optional)                                     |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`    | Web Push VAPID public key                                          |
 | `VAPID_PRIVATE_KEY`               | Web Push VAPID private key                                         |
 
 ### Photorealistic Atelier setup
 
-The Atelier uses Cloudflare Workers AI with `FLUX.2 Klein 4B` as its primary image model and automatically falls back to the existing no-key Pollinations provider. Add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to the server or Vercel environment for the highest-quality path; never expose the token with a `NEXT_PUBLIC_` prefix.
+The Atelier uses Cloudflare Workers AI with `FLUX.2 Klein 4B` as its primary image model. It sends compact, trusted reference boards for the selected flower, greenery, container, and previous preview so the result follows real catalog items instead of relying on text alone. Add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to the server or Vercel environment for the highest-quality path; never expose the token with a `NEXT_PUBLIC_` prefix.
+
+When Cloudflare is not configured, the best-effort Pollinations fallback now uses up to four allowlisted public product images with its image-editing model. This is materially more faithful than text-only generation, but the provider may add its own mark and availability is not guaranteed, so it should remain an emergency preview path rather than the production-quality provider.
 
 Generated previews are normalized to square JPEGs and saved in the public Supabase Storage bucket `atelier-previews`. FLUX.2 receives safe, resized reference boards built from the selected inventory images stored in Supabase, which materially improves flower and container fidelity. Identical first previews are cached by a deterministic selection hash; “new version” requests use the previous preview as a fourth reference.
 
