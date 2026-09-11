@@ -34,6 +34,28 @@ const limiters = {
         : null,
 }
 
+function numberInRange(value: unknown, min: number, max: number, fallback: number) {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return fallback
+    return Math.min(max, Math.max(min, Math.round(parsed)))
+}
+
+const atelierDailyLimit = numberInRange(
+    process.env.ATELIER_AI_DAILY_LIMIT,
+    1,
+    20,
+    5
+)
+
+const atelierDailyLimiter = redis
+    ? new Ratelimit({
+          redis,
+          limiter: Ratelimit.slidingWindow(atelierDailyLimit, '24 h'),
+          prefix: 'rl:atelier-ai:daily:v1',
+          timeout: 3_000,
+      })
+    : null
+
 export type RateLimitTier = keyof typeof limiters
 
 /**
@@ -66,6 +88,63 @@ export async function checkRateLimit(
     }
 
     return null
+}
+
+export type AtelierDailyQuota = {
+    success: boolean
+    limit: number
+    remaining: number
+    reset: number
+}
+
+/**
+ * Reads the daily Atelier quota without consuming a generation attempt.
+ * Returns null when Upstash is not configured or temporarily unavailable so
+ * the route can use its backwards-compatible Supabase fallback.
+ */
+export async function getAtelierDailyQuota(
+    identifier: string
+): Promise<Omit<AtelierDailyQuota, 'success'> | null> {
+    if (!atelierDailyLimiter) return null
+
+    try {
+        const result = await atelierDailyLimiter.getRemaining(identifier)
+        return {
+            limit: result.limit,
+            remaining: Math.max(0, Math.min(result.limit, result.remaining)),
+            reset: result.reset,
+        }
+    } catch (error) {
+        console.warn('[rate-limit] failed to read Atelier daily quota', error)
+        return null
+    }
+}
+
+/**
+ * Atomically reserves one expensive image generation attempt in Upstash.
+ * Provider failures still consume the attempt because they can consume the
+ * free provider allocation too. Cached previews never call this function.
+ */
+export async function consumeAtelierDailyQuota(
+    identifier: string
+): Promise<AtelierDailyQuota | null> {
+    if (!atelierDailyLimiter) return null
+
+    try {
+        const result = await atelierDailyLimiter.limit(identifier)
+
+        if (result.reason === 'timeout') return null
+
+        return {
+            success: result.success,
+            limit: result.limit,
+            remaining: Math.max(0, Math.min(result.limit, result.remaining)),
+            reset: result.reset,
+        }
+    } catch (error) {
+        console.warn('[rate-limit] failed to reserve Atelier daily quota', error)
+        return null
+    }
 }
 
 /** استخراج عنوان IP الحقيقي للعميل خلف بروكسي Vercel */

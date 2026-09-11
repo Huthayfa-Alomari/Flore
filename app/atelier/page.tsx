@@ -11,6 +11,7 @@ import Image from "next/image"
 import { createClient } from "@/lib/supabase/client"
 import { useCart } from "@/lib/store/cart-store"
 import { formatPrice } from "@/lib/utils"
+import { calculateBouquetUnitPrice } from "@/lib/atelier/pricing"
 import type { Product } from "@/types"
 
 // ─────────────────────────────────────────────────────────────
@@ -43,7 +44,7 @@ type Container = {
   price: number
   image: string | null
   in_stock: boolean
-  container_type: "basket" | "glass_vase" | "wrap" | "luxury_box"
+  container_type: "basket" | "glass_vase" | "vase" | "wrap" | "luxury_box"
 }
 
 type BouquetSize = {
@@ -62,6 +63,20 @@ type Step =
   | "size"
   | "message"
 
+type AiPreviewResponse = {
+  configured?: boolean
+  imageUrl?: string
+  remaining?: number
+  limit?: number
+  model?: string
+  cached?: boolean
+  referencesUsed?: number
+  error?: string
+}
+
+type GreeneryPreference = "less" | "as_is" | "more"
+type SpacingPreference = "compact" | "as_is" | "airy"
+
 // ─────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────
@@ -69,6 +84,7 @@ type Step =
 const CONTAINER_ICONS: Record<Container["container_type"], string> = {
   basket: "🧺",
   glass_vase: "🏺",
+  vase: "🏺",
   wrap: "💐",
   luxury_box: "🎁",
 }
@@ -76,6 +92,7 @@ const CONTAINER_ICONS: Record<Container["container_type"], string> = {
 const CONTAINER_LABELS: Record<Container["container_type"], string> = {
   basket: "سلة",
   glass_vase: "مزهرية زجاجية",
+  vase: "مزهرية",
   wrap: "تغليف باقة",
   luxury_box: "صندوق فاخر",
 }
@@ -350,6 +367,8 @@ export default function AtelierPage() {
 
   const [added, setAdded] = useState(false)
 
+  const previewRef = useRef<HTMLDivElement>(null)
+
   // ───────────────────────────────────────────────────────────
   // AI Preview
   // ───────────────────────────────────────────────────────────
@@ -362,6 +381,67 @@ export default function AtelierPage() {
 
   const [aiRemaining, setAiRemaining] =
     useState<number | null>(null)
+
+  const [aiError, setAiError] =
+    useState<string | null>(null)
+
+  const [aiModel, setAiModel] =
+    useState<string | null>(null)
+
+  const [aiAvailable, setAiAvailable] =
+    useState<boolean | null>(null)
+
+  const [aiCached, setAiCached] =
+    useState(false)
+
+  const [aiReferencesUsed, setAiReferencesUsed] =
+    useState(0)
+
+  const [greeneryPreference, setGreeneryPreference] =
+    useState<GreeneryPreference>("as_is")
+
+  const [spacingPreference, setSpacingPreference] =
+    useState<SpacingPreference>("as_is")
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadAiStatus() {
+      try {
+        const response = await fetch(
+          "/api/atelier/generate-preview",
+          {
+            method: "GET",
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        )
+        const data =
+          (await response.json()) as AiPreviewResponse
+
+        if (typeof data.remaining === "number") {
+          setAiRemaining(data.remaining)
+        }
+
+        setAiAvailable(
+          response.ok && data.configured !== false
+        )
+      } catch (statusError) {
+        if (
+          statusError instanceof DOMException &&
+          statusError.name === "AbortError"
+        ) {
+          return
+        }
+
+        setAiAvailable(null)
+      }
+    }
+
+    loadAiStatus()
+
+    return () => controller.abort()
+  }, [])
 
   // ───────────────────────────────────────────────────────────
   // Load Data
@@ -537,27 +617,32 @@ export default function AtelierPage() {
   const sizeMultiplier =
     selectedSizeObj?.price_multiplier || 1
 
-  // الحجم يطبق على الزهور فقط
   const totalPrice = useMemo(() => {
-    const flowersPrice =
-      flowersTotalPrice * sizeMultiplier
-
-    const greeneryPrice =
-      greeneryTotalPrice
-
-    const containerPrice =
-      selectedContainerObj?.price || 0
-
-    return (
-      flowersPrice +
-      greeneryPrice +
-      containerPrice
+    return calculateBouquetUnitPrice(
+      {
+        flowers: Object.entries(selectedFlowers).map(([id, qty]) => ({ id, qty })),
+        greenery: Object.entries(selectedGreenery).map(([id, qty]) => ({ id, qty })),
+        containerId: selectedContainer,
+        sizeKey: selectedSize || null,
+      },
+      {
+        flowerPrices: new Map(flowers.map(item => [item.id, item.price])),
+        greeneryPrices: new Map(greeneries.map(item => [item.id, item.price])),
+        containerPrices: new Map(containers.map(item => [item.id, item.price])),
+        sizeMultipliers: new Map(
+          bouquetSizes.map(item => [item.key, item.price_multiplier])
+        ),
+      }
     )
   }, [
-    flowersTotalPrice,
-    greeneryTotalPrice,
-    selectedContainerObj,
-    sizeMultiplier,
+    selectedFlowers,
+    selectedGreenery,
+    selectedContainer,
+    selectedSize,
+    flowers,
+    greeneries,
+    containers,
+    bouquetSizes,
   ])
 
   const totalFlowers = useMemo(
@@ -594,6 +679,10 @@ export default function AtelierPage() {
       })
 
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
+      setAiCached(false)
+      setAiReferencesUsed(0)
     },
     []
   )
@@ -624,6 +713,10 @@ export default function AtelierPage() {
       })
 
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
+      setAiCached(false)
+      setAiReferencesUsed(0)
     },
     []
   )
@@ -741,6 +834,10 @@ export default function AtelierPage() {
       setSelectedFlowers(next)
       setShowPresets(false)
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
+      setAiCached(false)
+      setAiReferencesUsed(0)
       setActiveStep("flowers")
     },
     [flowers]
@@ -771,7 +868,12 @@ export default function AtelierPage() {
     setActiveStep("flowers")
     setShowPresets(true)
     setAiImageUrl(null)
-    setAiRemaining(null)
+    setAiError(null)
+    setAiModel(null)
+    setAiCached(false)
+    setAiReferencesUsed(0)
+    setGreeneryPreference("as_is")
+    setSpacingPreference("as_is")
     setAdded(false)
     setColorFilter("all")
   }, [bouquetSizes])
@@ -783,8 +885,15 @@ export default function AtelierPage() {
   const handleGenerateAiPreview =
     useCallback(async () => {
       if (totalFlowers === 0) {
-        window.alert(
-          "الرجاء اختيار زهور أولاً"
+        setAiError(
+          "اختر زهرة واحدة على الأقل قبل إنشاء المعاينة."
+        )
+        return
+      }
+
+      if (!selectedContainer) {
+        setAiError(
+          "اختر طريقة تقديم الباقة أولاً حتى تظهر المعاينة بشكل مطابق."
         )
         return
       }
@@ -793,15 +902,29 @@ export default function AtelierPage() {
         return
       }
 
+      if (aiAvailable === false) {
+        setAiError(
+          "خدمة المعاينة غير متاحة حالياً. تحقق من إعدادات السيرفر."
+        )
+        return
+      }
+
       if (aiRemaining === 0) {
-        window.alert(
+        setAiError(
           "انتهت محاولات المعاينة المجانية لهذا اليوم."
         )
         return
       }
 
       setIsGeneratingAi(true)
-      setAiImageUrl(null)
+      setAiError(null)
+
+      const controller =
+        new AbortController()
+      const timeout = window.setTimeout(
+        () => controller.abort(),
+        70_000
+      )
 
       try {
         const res = await fetch(
@@ -832,15 +955,29 @@ export default function AtelierPage() {
                 selectedContainer,
 
               sizeKey:
-                selectedSize,
+                selectedSize ||
+                undefined,
+
+              greeneryPreference,
+
+              spacingPreference,
+
+              regenerate: Boolean(aiImageUrl),
+
+              previousImageUrl:
+                aiImageUrl ||
+                undefined,
             }),
+            signal:
+              controller.signal,
           }
         )
 
-        const data = await res.json()
+        const data =
+          (await res.json()) as AiPreviewResponse
 
         if (!res.ok) {
-          window.alert(
+          setAiError(
             data?.error ||
             "تعذر توليد الصورة حالياً"
           )
@@ -864,6 +1001,14 @@ export default function AtelierPage() {
         }
 
         setAiImageUrl(data.imageUrl)
+        setAiModel(
+          data.model || null
+        )
+        setAiCached(Boolean(data.cached))
+        setAiReferencesUsed(data.referencesUsed || 0)
+        setAiAvailable(true)
+        setGreeneryPreference("as_is")
+        setSpacingPreference("as_is")
 
         if (
           typeof data?.remaining ===
@@ -879,20 +1024,33 @@ export default function AtelierPage() {
           err
         )
 
-        window.alert(
-          "تعذر توليد الصورة حالياً، يرجى المحاولة مرة أخرى."
+        const timedOut =
+          err instanceof DOMException &&
+          err.name === "AbortError"
+
+        setAiError(
+          timedOut
+            ? "استغرق إنشاء الصورة وقتاً أطول من المتوقع. حاول مرة أخرى."
+            : "تعذر الاتصال بخدمة الصور حالياً. حاول مرة أخرى."
         )
       } finally {
+        window.clearTimeout(
+          timeout
+        )
         setIsGeneratingAi(false)
       }
     }, [
       totalFlowers,
       isGeneratingAi,
+      aiAvailable,
       aiRemaining,
       selectedFlowers,
       selectedGreenery,
       selectedContainer,
       selectedSize,
+      greeneryPreference,
+      spacingPreference,
+      aiImageUrl,
     ])
 
   // ───────────────────────────────────────────────────────────
@@ -908,6 +1066,10 @@ export default function AtelierPage() {
       )
 
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
+      setAiCached(false)
+      setAiReferencesUsed(0)
     },
     []
   )
@@ -920,6 +1082,10 @@ export default function AtelierPage() {
     (sizeKey: string) => {
       setSelectedSize(sizeKey)
       setAiImageUrl(null)
+      setAiError(null)
+      setAiModel(null)
+      setAiCached(false)
+      setAiReferencesUsed(0)
     },
     []
   )
@@ -932,6 +1098,13 @@ export default function AtelierPage() {
     if (totalFlowers === 0) {
       window.alert(
         "اختر زهرة واحدة على الأقل"
+      )
+      return
+    }
+
+    if (!selectedContainerObj) {
+      window.alert(
+        "اختر طريقة تقديم الباقة قبل إضافتها للسلة"
       )
       return
     }
@@ -949,6 +1122,23 @@ export default function AtelierPage() {
           return `${flower?.name_ar ||
             flower?.name ||
             "زهرة"
+            } ×${qty}`
+        })
+        .join("، ")
+
+    const selectedGreeneryNames =
+      Object.entries(
+        selectedGreenery
+      )
+        .map(([id, qty]) => {
+          const greenery =
+            greeneries.find(
+              item => item.id === id
+            )
+
+          return `${greenery?.name_ar ||
+            greenery?.name ||
+            "أوراق خضراء"
             } ×${qty}`
         })
         .join("، ")
@@ -973,6 +1163,12 @@ export default function AtelierPage() {
     if (containerName) {
       descriptionParts.push(
         `الحاوية: ${containerName}`
+      )
+    }
+
+    if (selectedGreeneryNames) {
+      descriptionParts.push(
+        `الخضار: ${selectedGreeneryNames}`
       )
     }
 
@@ -1094,6 +1290,17 @@ export default function AtelierPage() {
             ? containerName
             : "",
 
+        greenery:
+          selectedGreeneryNames
+            ? selectedGreeneryNames.split("، ")
+            : [],
+
+        container:
+          containerName,
+
+        size:
+          sizeName,
+
         message:
           giftMessage,
       },
@@ -1107,9 +1314,28 @@ export default function AtelierPage() {
             qty,
           })),
 
+        greenery:
+          Object.entries(
+            selectedGreenery
+          ).map(([id, qty]) => ({
+            id,
+            qty,
+          })),
+
+        containerId:
+          selectedContainerObj.id,
+
         wrapId,
 
         vaseId,
+
+        sizeKey:
+          selectedSize ||
+          undefined,
+
+        previewImageUrl:
+          aiImageUrl ||
+          undefined,
       },
     })
 
@@ -1124,12 +1350,15 @@ export default function AtelierPage() {
   }, [
     totalFlowers,
     selectedFlowers,
+    selectedGreenery,
     flowers,
+    greeneries,
     selectedContainerObj,
     totalPrice,
     giftMessage,
     addItem,
     selectedSizeObj,
+    selectedSize,
     aiImageUrl,
   ])
 
@@ -1385,7 +1614,7 @@ export default function AtelierPage() {
                   </span>
 
                   <span
-                    className={`text-sm font-medium hidden md:inline ${isActive
+                    className={`text-xs md:text-sm font-medium ${isActive
                       ? "text-flore-text-primary font-bold"
                       : "text-flore-text-secondary"
                       }`}
@@ -1966,11 +2195,18 @@ export default function AtelierPage() {
                           "size"
                         )
                       }
-                      className="bg-flore-primary text-white px-6 py-2.5 rounded-xl font-bold hover:brightness-110 transition shadow-md"
+                      disabled={!selectedContainer}
+                      className="bg-flore-primary text-white px-6 py-2.5 rounded-xl font-bold hover:brightness-110 transition shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       التالي
                     </button>
                   </div>
+
+                  {!selectedContainer && (
+                    <p className="text-xs text-flore-text-secondary text-left">
+                      اختر طريقة تقديم الباقة للمتابعة.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -2178,7 +2414,7 @@ export default function AtelierPage() {
           {/* PREVIEW SIDEBAR */}
           {/* ─────────────────────────────────────────────── */}
 
-          <div className="lg:col-span-2">
+          <div ref={previewRef} className="lg:col-span-2 scroll-mt-6">
             <div className="sticky top-6 space-y-4">
 
               <div
@@ -2200,21 +2436,43 @@ export default function AtelierPage() {
                   معاينة الباقة
                 </h3>
 
-                <div className="relative mx-auto w-full max-w-[280px] aspect-[3/4] mb-4 rounded-2xl overflow-hidden bg-flore-bg/50 flex items-center justify-center">
+                <div className="relative mx-auto w-full max-w-[320px] aspect-square mb-4 rounded-2xl overflow-hidden bg-flore-bg/50 flex items-center justify-center">
 
                   {/* AI CTA */}
                   {totalFlowers >
                     0 &&
                     !aiImageUrl &&
                     !isGeneratingAi && (
-                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-flore-bg/80 backdrop-blur-sm p-4 text-center">
-                        <div className="text-3xl mb-2">
-                          🪄
+                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gradient-to-b from-flore-bg/90 via-flore-bg/95 to-flore-card/95 backdrop-blur-md p-5 text-center">
+                        <div className="w-12 h-12 rounded-2xl bg-flore-primary text-white flex items-center justify-center mb-3 shadow-lg shadow-flore-primary/20">
+                          <svg
+                            className="w-6 h-6"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.8}
+                              d="M12 3l1.3 3.7L17 8l-3.7 1.3L12 13l-1.3-3.7L7 8l3.7-1.3L12 3Zm6 9 .8 2.2L21 15l-2.2.8L18 18l-.8-2.2L15 15l2.2-.8L18 12ZM6 13l1 2.8L10 17l-3 1.2L6 21l-1-2.8L2 17l3-1.2L6 13Z"
+                            />
+                          </svg>
                         </div>
 
-                        <p className="text-flore-text-primary font-bold text-sm mb-3">
-                          هل تريد رؤية شكل
-                          باقتك فعلياً؟
+                        <span className="text-[10px] tracking-[0.2em] uppercase text-flore-primary font-bold mb-2">
+                          FLORÉ AI
+                        </span>
+
+                        <p className="text-flore-text-primary font-bold text-base mb-1">
+                          شاهد باقتك بصورة واقعية
+                        </p>
+
+                        <p className="text-flore-text-secondary text-xs leading-relaxed mb-4 max-w-[220px]">
+                          نحول الزهور والألوان
+                          والحجم الذي اخترته إلى
+                          صورة استوديو فاخرة.
                         </p>
 
                         <button
@@ -2223,16 +2481,26 @@ export default function AtelierPage() {
                           }
                           disabled={
                             aiRemaining ===
-                            0
+                            0 ||
+                            aiAvailable ===
+                            false ||
+                            !selectedContainer
                           }
-                          className="bg-flore-primary text-white px-4 py-2 rounded-xl font-bold text-sm hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full bg-flore-primary text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:brightness-110 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          توليد معاينة واقعية
-                          (AI) 📸
+                          {aiAvailable ===
+                            false
+                            ? "الخدمة غير متاحة حالياً"
+                            : !selectedContainer
+                            ? "اختر الحاوية أولاً"
+                            : "إنشاء معاينة واقعية"}
                         </button>
 
                         <span className="text-xs text-flore-text-secondary mt-2">
-                          {aiRemaining ===
+                          {aiAvailable ===
+                            false
+                            ? "تحقق من إعدادات الخدمة"
+                            : aiRemaining ===
                             null
                             ? "حتى 5 محاولات يومياً"
                             : aiRemaining >
@@ -2245,31 +2513,50 @@ export default function AtelierPage() {
 
                   {/* AI Loading */}
                   {isGeneratingAi && (
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-flore-bg/90 backdrop-blur-sm">
+                    <div
+                      className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-flore-bg/90 backdrop-blur-md p-5"
+                      aria-live="polite"
+                    >
                       <div className="w-12 h-12 rounded-full border-4 border-flore-primary/20 border-t-flore-primary animate-spin mb-3" />
 
                       <p className="text-flore-text-primary font-bold text-sm text-center px-4">
-                        جاري تصميم باقتك
-                        بالذكاء الاصطناعي...
+                        نصنع المعاينة الواقعية
+                        لباقتك
                       </p>
 
-                      <p className="text-flore-text-secondary text-xs mt-1">
-                        قد يستغرق ذلك
-                        15 ثانية
+                      <p className="text-flore-text-secondary text-xs mt-1 text-center leading-relaxed">
+                        نضبط أنواع الزهور والألوان
+                        والإضاءة، وقد يستغرق ذلك
+                        أقل من دقيقة.
                       </p>
                     </div>
                   )}
 
                   {/* AI Image */}
                   {aiImageUrl ? (
-                    <Image
-                      src={
-                        aiImageUrl
-                      }
-                      alt="معاينة الباقة بالذكاء الاصطناعي"
-                      fill
-                      className="object-cover transition-transform duration-700 hover:scale-105"
-                    />
+                    <>
+                      <Image
+                        src={
+                          aiImageUrl
+                        }
+                        alt="معاينة فوتوغرافية للباقة بالذكاء الاصطناعي"
+                        fill
+                        sizes="(max-width: 1024px) 280px, 20vw"
+                        className="object-cover transition-transform duration-700 hover:scale-105"
+                      />
+
+                      <div className="absolute bottom-3 left-3 z-10 rounded-full bg-black/55 backdrop-blur-md text-white px-2.5 py-1 text-[10px] tracking-wide">
+                        FLORÉ AI
+                        {aiModel
+                          ? ` · ${aiModel}`
+                          : ""}
+                        {aiCached
+                          ? " · محفوظة"
+                          : aiReferencesUsed > 0
+                          ? ` · ${aiReferencesUsed} مراجع`
+                          : ""}
+                      </div>
+                    </>
                   ) : (
                     !isGeneratingAi && (
                       <>
@@ -2391,6 +2678,60 @@ export default function AtelierPage() {
                   )}
                 </div>
 
+                {aiImageUrl && (
+                  <div className="mb-3 rounded-2xl border border-flore-border bg-flore-bg/60 p-3 space-y-3">
+                    <div>
+                      <p className="text-xs font-bold text-flore-text-primary mb-2">
+                        كثافة الأوراق
+                      </p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {([
+                          { value: "less", label: "أقل" },
+                          { value: "as_is", label: "كما هي" },
+                          { value: "more", label: "أكثر" },
+                        ] as const).map(option => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setGreeneryPreference(option.value)}
+                            className={`rounded-lg px-2 py-1.5 text-xs font-bold transition ${greeneryPreference === option.value
+                              ? "bg-flore-primary text-white"
+                              : "bg-flore-card text-flore-text-secondary border border-flore-border"
+                              }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-bold text-flore-text-primary mb-2">
+                        شكل التنسيق
+                      </p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {([
+                          { value: "compact", label: "متقارب" },
+                          { value: "as_is", label: "كما هو" },
+                          { value: "airy", label: "أوسع" },
+                        ] as const).map(option => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setSpacingPreference(option.value)}
+                            className={`rounded-lg px-2 py-1.5 text-xs font-bold transition ${spacingPreference === option.value
+                              ? "bg-flore-primary text-white"
+                              : "bg-flore-card text-flore-text-secondary border border-flore-border"
+                              }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Regenerate */}
                 {aiImageUrl && (
                   <button
@@ -2400,15 +2741,37 @@ export default function AtelierPage() {
                     disabled={
                       aiRemaining ===
                       0 ||
-                      isGeneratingAi
+                      isGeneratingAi ||
+                      aiAvailable ===
+                      false
                     }
-                    className="w-full mb-3 text-sm text-flore-primary bg-flore-primary/10 py-2 rounded-lg font-bold hover:bg-flore-primary/20 transition disabled:opacity-50"
+                    className="w-full mb-2 text-sm text-flore-primary bg-flore-primary/10 py-2.5 rounded-xl font-bold hover:bg-flore-primary/20 transition disabled:opacity-50"
                   >
                     {aiRemaining ===
                       0
                       ? "انتهت المحاولات"
-                      : "🔁 إعادة التوليد"}
+                      : greeneryPreference !== "as_is" ||
+                        spacingPreference !== "as_is"
+                      ? "تطبيق التعديلات على الصورة"
+                      : "إنشاء نسخة واقعية جديدة"}
                   </button>
+                )}
+
+                {aiImageUrl && (
+                  <p className="text-[11px] text-flore-text-secondary text-center leading-relaxed mb-3">
+                    المعاينة تقريبية، وقد تختلف
+                    التفاصيل الطبيعية قليلاً عند
+                    تنسيق الباقة الفعلية.
+                  </p>
+                )}
+
+                {aiError && (
+                  <div
+                    className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs leading-relaxed text-red-700 text-center"
+                    role="alert"
+                  >
+                    {aiError}
+                  </div>
                 )}
 
                 {/* Message Preview */}
@@ -2521,12 +2884,15 @@ export default function AtelierPage() {
                   disabled={
                     totalFlowers ===
                     0 ||
+                    !selectedContainer ||
                     added
                   }
                   className={`w-full py-3.5 rounded-xl font-bold text-base transition-all duration-300 flex items-center justify-center gap-2 ${added
                     ? "bg-green-500 text-white"
                     : totalFlowers ===
                       0
+                      ? "bg-flore-border text-flore-text-secondary cursor-not-allowed"
+                      : !selectedContainer
                       ? "bg-flore-border text-flore-text-secondary cursor-not-allowed"
                       : "bg-flore-primary text-white hover:brightness-110 shadow-lg active:scale-[0.98]"
                     }`}
@@ -2553,7 +2919,9 @@ export default function AtelierPage() {
                       🌸
                     </>
                   ) : (
-                    "أضف لهديتك"
+                    !selectedContainer
+                      ? "اختر الحاوية أولاً"
+                      : "أضف لهديتك"
                   )}
                 </button>
 
@@ -2575,6 +2943,21 @@ export default function AtelierPage() {
           </div>
         </div>
       </div>
+
+      {totalFlowers > 0 && (
+        <button
+          type="button"
+          onClick={() =>
+            previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+          className="lg:hidden fixed bottom-20 inset-x-4 z-40 rounded-2xl bg-flore-primary text-white shadow-xl px-4 py-3 flex items-center justify-between"
+        >
+          <span className="font-bold">معاينة الباقة</span>
+          <span className="font-amiri text-lg font-bold">
+            {formatPrice(totalPrice)}
+          </span>
+        </button>
+      )}
     </div>
   )
 }

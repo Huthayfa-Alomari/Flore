@@ -15,6 +15,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'i.pinimg.com', // ✅ تم إضافته بشكل صحيح داخل المصفوفة
       },
+      {
+        protocol: 'https',
+        hostname: 'www.ikea.com',
+      },
     ],
     formats: ['image/avif', 'image/webp'],
   },
