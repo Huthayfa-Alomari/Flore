@@ -25,14 +25,19 @@ export interface CartItem {
     flowers: string[];
     wrap: string;
     vase: string;
+    greenery?: string[];
+    container?: string;
+    size?: string;
     message?: string;
   };
   bouquetSelection?: {
     flowers: { id: string; qty: number }[];
     greenery?: { id: string; qty: number }[];
+    containerId?: string | null;
     wrapId: string | null;
     vaseId: string | null;
     sizeKey?: string;
+    previewImageUrl?: string;
   };
 }
 
@@ -46,8 +51,20 @@ export interface OrderItem {
     flowers: string[];
     wrap: string;
     vase: string;
+    greenery?: string[];
+    container?: string;
+    size?: string;
     message?: string;
   } | null;
+  bouquet_selection?: {
+    flowers: { id: string; qty: number }[];
+    greenery: { id: string; qty: number }[];
+    containerId: string | null;
+    wrapId: string | null;
+    vaseId: string | null;
+    sizeKey: string | null;
+    previewImageUrl: string | null;
+  };
 }
 
 export interface Order {

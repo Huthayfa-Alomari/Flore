@@ -1,6 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
+import {
+    calculateBouquetUnitPrice,
+    hasConflictingContainerIds,
+    resolveBouquetContainerId,
+} from '@/lib/atelier/pricing'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -8,6 +13,9 @@ const CustomizationSchema = z.object({
     flowers: z.array(z.string()).optional(),
     wrap: z.string().optional(),
     vase: z.string().optional(),
+    greenery: z.array(z.string()).optional(),
+    container: z.string().optional(),
+    size: z.string().optional(),
     message: z.string().optional(),
 }).optional().nullable()
 
@@ -20,9 +28,19 @@ const BouquetSelectionSchema = z.object({
         id: z.string().uuid(),
         qty: z.number().int().min(1).max(50),
     })).max(30).optional(),
+    containerId: z.string().uuid().nullable().optional(),
     wrapId: z.string().uuid().nullable().optional(),
     vaseId: z.string().uuid().nullable().optional(),
     sizeKey: z.string().max(50).optional(),
+    previewImageUrl: z.string().url().max(2048).optional(),
+}).superRefine((selection, ctx) => {
+    if (hasConflictingContainerIds(selection)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Only one bouquet container may be selected',
+            path: ['containerId'],
+        })
+    }
 })
 
 const OrderItemSchema = z.object({
@@ -52,6 +70,33 @@ const CreateOrderSchema = z.object({
 
 function isCustomItem(productId: string) {
     return productId.startsWith('custom-')
+}
+
+function trustedPreviewImageUrl(value: string | undefined) {
+    if (!value) return null
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!supabaseUrl) return null
+
+    try {
+        const url = new URL(value)
+        const expectedOrigin = new URL(supabaseUrl).origin
+        const previewPrefix = '/storage/v1/object/public/atelier-previews/'
+
+        if (
+            url.protocol !== 'https:' ||
+            url.origin !== expectedOrigin ||
+            !url.pathname.startsWith(previewPrefix) ||
+            url.username ||
+            url.password
+        ) {
+            return null
+        }
+
+        return url.toString()
+    } catch {
+        return null
+    }
 }
 
 export async function POST(request: NextRequest) {
@@ -151,7 +196,7 @@ export async function POST(request: NextRequest) {
     // ---- تحقق وحساب الباقات المخصصة من قاعدة البيانات مباشرة ----
     type FlowerRow = { id: string; name: string; name_ar: string | null; price: number; image: string | null; in_stock: boolean }
     type GreeneryRow = { id: string; name: string; name_ar: string | null; price: number; in_stock: boolean }
-    type ContainerRow = { id: string; name: string; name_ar: string | null; price: number; in_stock: boolean }
+    type ContainerRow = { id: string; name: string; name_ar: string | null; price: number; in_stock: boolean; container_type: string | null }
     type SizeRow = { key: string; label_ar: string; price_multiplier: number }
 
     let flowerMap = new Map<string, FlowerRow>()
@@ -166,9 +211,10 @@ export async function POST(request: NextRequest) {
         const allGreeneryIds = Array.from(new Set(
             customItems.flatMap((i) => i.bouquet_selection!.greenery?.map((g) => g.id) || [])
         ))
-        // ملاحظة: vaseId يمثل الآن "الحاوية الموحّدة" (سلة/مزهرية/تغليف/صندوق) — نقرأها من vase_options
         const allContainerIds = Array.from(new Set(
-            customItems.map((i) => i.bouquet_selection!.vaseId).filter((id): id is string => !!id)
+            customItems
+                .map((i) => resolveBouquetContainerId(i.bouquet_selection!))
+                .filter((id): id is string => !!id)
         ))
         const allSizeKeys = Array.from(new Set(
             customItems.map((i) => i.bouquet_selection!.sizeKey).filter((k): k is string => !!k)
@@ -182,7 +228,7 @@ export async function POST(request: NextRequest) {
                 ? supabase.from('greenery_options').select('id, name, name_ar, price, in_stock').in('id', allGreeneryIds)
                 : Promise.resolve({ data: [], error: null }),
             allContainerIds.length
-                ? supabase.from('vase_options').select('id, name, name_ar, price, in_stock').in('id', allContainerIds)
+                ? supabase.from('vase_options').select('id, name, name_ar, price, in_stock, container_type').in('id', allContainerIds)
                 : Promise.resolve({ data: [], error: null }),
             allSizeKeys.length
                 ? supabase.from('bouquet_sizes').select('key, label_ar, price_multiplier').in('key', allSizeKeys)
@@ -221,7 +267,7 @@ export async function POST(request: NextRequest) {
                     return NextResponse.json({ error: `Greenery "${greenery.name}" is out of stock` }, { status: 400 })
                 }
             }
-            const containerId = item.bouquet_selection!.vaseId
+            const containerId = resolveBouquetContainerId(item.bouquet_selection!)
             if (containerId) {
                 const container = containerMap.get(containerId)
                 if (!container) {
@@ -235,21 +281,22 @@ export async function POST(request: NextRequest) {
             if (sizeKey && !sizeMap.has(sizeKey)) {
                 return NextResponse.json({ error: `Bouquet size "${sizeKey}" not found` }, { status: 400 })
             }
+            if (
+                item.bouquet_selection!.previewImageUrl &&
+                !trustedPreviewImageUrl(item.bouquet_selection!.previewImageUrl)
+            ) {
+                return NextResponse.json({ error: 'Invalid Atelier preview image URL' }, { status: 400 })
+            }
         }
     }
 
     function computeCustomBouquetPrice(selection: NonNullable<typeof customItems[number]['bouquet_selection']>) {
-        const flowersPrice = selection.flowers.reduce((sum, f) => {
-            const flower = flowerMap.get(f.id)!
-            return sum + flower.price * f.qty
-        }, 0)
-        const greeneryPrice = (selection.greenery || []).reduce((sum, g) => {
-            const item = greeneryMap.get(g.id)!
-            return sum + item.price * g.qty
-        }, 0)
-        const containerPrice = selection.vaseId ? (containerMap.get(selection.vaseId)?.price || 0) : 0
-        const multiplier = selection.sizeKey ? (sizeMap.get(selection.sizeKey)?.price_multiplier || 1) : 1
-        return (flowersPrice + greeneryPrice + containerPrice) * multiplier
+        return calculateBouquetUnitPrice(selection, {
+            flowerPrices: new Map(Array.from(flowerMap, ([id, item]) => [id, item.price])),
+            greeneryPrices: new Map(Array.from(greeneryMap, ([id, item]) => [id, item.price])),
+            containerPrices: new Map(Array.from(containerMap, ([id, item]) => [id, item.price])),
+            sizeMultipliers: new Map(Array.from(sizeMap, ([key, item]) => [key, item.price_multiplier])),
+        })
     }
 
     function buildCustomBouquetDisplay(selection: NonNullable<typeof customItems[number]['bouquet_selection']>) {
@@ -261,13 +308,19 @@ export async function POST(request: NextRequest) {
             const item = greeneryMap.get(g.id)!
             return `${item.name_ar || item.name} ×${g.qty}`
         }).join('، ')
-        const container = selection.vaseId ? containerMap.get(selection.vaseId) : null
+        const containerId = resolveBouquetContainerId(selection)
+        const container = containerId ? containerMap.get(containerId) : null
         const size = selection.sizeKey ? sizeMap.get(selection.sizeKey) : null
         const name = `باقة مخصصة — ${flowerNames}`
-        const image = flowerMap.get(selection.flowers[0].id)?.image || ''
+        const image =
+            trustedPreviewImageUrl(selection.previewImageUrl) ||
+            flowerMap.get(selection.flowers[0].id)?.image ||
+            ''
         return {
             name,
             image,
+            container,
+            containerId,
             containerName: container?.name_ar || container?.name || '',
             greeneryNames,
             sizeLabel: size?.label_ar || '',
@@ -310,9 +363,26 @@ export async function POST(request: NextRequest) {
                         const flower = flowerMap.get(f.id)!
                         return `${flower.name_ar || flower.name} ×${f.qty}`
                     }),
-                    wrap: display.greeneryNames,
-                    vase: `${display.containerName}${display.sizeLabel ? ` — ${display.sizeLabel}` : ''}`,
+                    greenery: (item.bouquet_selection!.greenery || []).map((g) => {
+                        const greenery = greeneryMap.get(g.id)!
+                        return `${greenery.name_ar || greenery.name} ×${g.qty}`
+                    }),
+                    wrap: display.container?.container_type === 'wrap' ? display.containerName : '',
+                    vase: display.container?.container_type !== 'wrap' ? display.containerName : '',
+                    container: display.containerName,
+                    size: display.sizeLabel,
                     message: item.customization?.message || '',
+                },
+                bouquet_selection: {
+                    flowers: item.bouquet_selection!.flowers,
+                    greenery: item.bouquet_selection!.greenery || [],
+                    containerId: display.containerId,
+                    wrapId: item.bouquet_selection!.wrapId || null,
+                    vaseId: item.bouquet_selection!.vaseId || null,
+                    sizeKey: item.bouquet_selection!.sizeKey || null,
+                    previewImageUrl: trustedPreviewImageUrl(
+                        item.bouquet_selection!.previewImageUrl
+                    ),
                 },
             }
         }),

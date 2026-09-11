@@ -17,6 +17,9 @@ DROP TABLE IF EXISTS profiles CASCADE;
 DROP TABLE IF EXISTS flower_types CASCADE;
 DROP TABLE IF EXISTS wrap_options CASCADE;
 DROP TABLE IF EXISTS vase_options CASCADE;
+DROP TABLE IF EXISTS greenery_options CASCADE;
+DROP TABLE IF EXISTS bouquet_sizes CASCADE;
+DROP TABLE IF EXISTS ai_generation_logs CASCADE;
 
 -- ========================================================
 -- 🚀 ثانياً: إعادة البناء بنظافة (Fresh Authoritative Schema)
@@ -114,9 +117,38 @@ CREATE TABLE vase_options (
     name_ar TEXT,
     price NUMERIC NOT NULL DEFAULT 0,
     image TEXT,
+    container_type TEXT NOT NULL DEFAULT 'vase',
     in_stock BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE greenery_options (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    name_ar TEXT,
+    price NUMERIC NOT NULL DEFAULT 0,
+    image TEXT,
+    in_stock BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE bouquet_sizes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    key TEXT NOT NULL UNIQUE,
+    label_ar TEXT NOT NULL,
+    desc_ar TEXT,
+    stem_count INTEGER NOT NULL CHECK (stem_count > 0),
+    price_multiplier NUMERIC NOT NULL DEFAULT 1 CHECK (price_multiplier > 0)
+);
+
+CREATE TABLE ai_generation_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identifier TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ai_generation_logs_identifier_created_at_idx
+  ON ai_generation_logs (identifier, created_at DESC);
 
 -- 7. جدول الطلبات الشامل والمحمي (Orders Table)
 CREATE TABLE orders (
@@ -125,11 +157,20 @@ CREATE TABLE orders (
     customer_name TEXT NOT NULL,
     customer_phone TEXT NOT NULL,
     customer_email TEXT,
-    delivery_address TEXT NOT NULL,
+    delivery_address TEXT,
     delivery_region TEXT,
     delivery_notes TEXT,
     delivery_date TIMESTAMPTZ,
     gift_message TEXT,
+    gift_media_url TEXT,
+    gift_media_type TEXT,
+    gift_token UUID DEFAULT gen_random_uuid(),
+    delivery_time_slot TEXT,
+    is_anonymous_gift BOOLEAN DEFAULT false,
+    awaiting_recipient_address BOOLEAN DEFAULT false,
+    recipient_address_token UUID DEFAULT gen_random_uuid(),
+    recipient_name TEXT,
+    recipient_phone TEXT,
     payment_method TEXT NOT NULL, -- whatsapp, cliq, cash, stripe
     payment_status TEXT NOT NULL DEFAULT 'pending',
     payment_transaction_id TEXT,
@@ -162,7 +203,7 @@ DECLARE
 BEGIN
   SELECT COALESCE(SUM(price * qty), 0)
   INTO item_sum
-  FROM jsonb_to_recordset(NEW.items) AS x(product_id UUID, price NUMERIC, qty INT);
+  FROM jsonb_to_recordset(NEW.items) AS x(product_id TEXT, price NUMERIC, qty INT);
 
   -- سماحية ضئيلة جداً 0.01 لتجنب مشاكل الفواصل العشرية في السيرفر
   IF ABS(COALESCE(NEW.total, 0) - item_sum) > 0.01 THEN
@@ -241,6 +282,23 @@ INSERT INTO vase_options (name, name_ar, price, image, in_stock) VALUES
 ('Ceramic Vase', 'مزهرية سيراميك', 12.00, '', true),
 ('No Vase', 'بدون مزهرية', 0.00, '', true);
 
+INSERT INTO greenery_options (name, name_ar, price, image, in_stock) VALUES
+('Eucalyptus', 'أوكالبتوس', 1.25, '', true),
+('Ruscus', 'روسكوس', 1.00, '', true),
+('Baby''s Breath', 'جيبسوفيلا', 1.50, '', true);
+
+INSERT INTO bouquet_sizes (key, label_ar, desc_ar, stem_count, price_multiplier) VALUES
+('regular', 'عادي', 'تنسيق متوازن وناعم', 12, 1.00),
+('deluxe', 'ديلوكس', 'باقة أكثر امتلاءً', 20, 1.35),
+('premium', 'بريميوم', 'تنسيق فاخر وكثيف', 30, 1.65);
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('atelier-previews', 'atelier-previews', true, 10485760, ARRAY['image/jpeg'])
+ON CONFLICT (id) DO UPDATE SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
+
 -- ============================================
 -- RLS POLICIES (Phase 3 Security)
 -- ============================================
@@ -255,6 +313,11 @@ ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE flower_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wrap_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vase_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE greenery_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bouquet_sizes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_generation_logs ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON ai_generation_logs FROM anon, authenticated;
 
 -- Products: readable by all, writable by admin only
 CREATE POLICY "Products are viewable by everyone" ON products
@@ -339,3 +402,17 @@ CREATE POLICY "Vase options are viewable by everyone" ON vase_options
   FOR SELECT USING (true);
 CREATE POLICY "Vase options are writable by admin only" ON vase_options
   FOR ALL USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'));
+
+CREATE POLICY "Public can view greenery" ON greenery_options
+  FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Admin can manage greenery" ON greenery_options
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = (SELECT auth.uid()) AND role = 'admin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM user_roles WHERE user_id = (SELECT auth.uid()) AND role = 'admin'));
+
+CREATE POLICY "Public can view sizes" ON bouquet_sizes
+  FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Admin can manage sizes" ON bouquet_sizes
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = (SELECT auth.uid()) AND role = 'admin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM user_roles WHERE user_id = (SELECT auth.uid()) AND role = 'admin'));

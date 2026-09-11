@@ -1,8 +1,13 @@
-import { createHmac } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import sharp from 'sharp'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
+import {
+  checkRateLimit,
+  consumeAtelierDailyQuota,
+  getAtelierDailyQuota,
+  getClientIp,
+} from '@/lib/rate-limit'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
@@ -13,6 +18,9 @@ export const maxDuration = 60
 const PRIMARY_MODEL = '@cf/black-forest-labs/flux-2-klein-4b'
 const FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-schnell'
 const PREVIEW_BUCKET = 'atelier-previews'
+const PROMPT_VERSION = 'atelier-v3-references'
+const MAX_REFERENCE_BYTES = 6 * 1024 * 1024
+const REFERENCE_SIZE = 448
 
 const GeneratePreviewSchema = z.object({
   flowers: z
@@ -35,6 +43,10 @@ const GeneratePreviewSchema = z.object({
     .default([]),
   containerId: z.string().uuid().nullable().optional(),
   sizeKey: z.string().trim().min(1).max(50).optional(),
+  greeneryPreference: z.enum(['less', 'as_is', 'more']).default('as_is'),
+  spacingPreference: z.enum(['compact', 'as_is', 'airy']).default('as_is'),
+  regenerate: z.boolean().default(false),
+  previousImageUrl: z.string().url().max(2048).optional(),
 })
 
 type FlowerRow = {
@@ -42,12 +54,14 @@ type FlowerRow = {
   name: string
   name_ar: string | null
   color: string | null
+  image: string | null
 }
 
 type GreeneryRow = {
   id: string
   name: string
   name_ar: string | null
+  image: string | null
 }
 
 type ContainerRow = {
@@ -55,6 +69,7 @@ type ContainerRow = {
   name: string
   name_ar: string | null
   container_type: string | null
+  image: string | null
 }
 
 type SizeRow = {
@@ -68,6 +83,8 @@ type BouquetSelection = {
   greenery: Array<GreeneryRow & { qty: number }>
   container: ContainerRow | null
   size: SizeRow | null
+  greeneryPreference: 'less' | 'as_is' | 'more'
+  spacingPreference: 'compact' | 'as_is' | 'airy'
 }
 
 type CloudflarePayload = {
@@ -79,6 +96,12 @@ type CloudflarePayload = {
 type GeneratedImage = {
   buffer: Buffer
   model: string
+  referencesUsed: number
+}
+
+type PreparedReference = {
+  buffer: Buffer
+  purpose: 'flowers' | 'greenery' | 'container' | 'previous'
 }
 
 class AiProviderError extends Error {
@@ -131,8 +154,11 @@ function cleanPromptText(value: string | null | undefined, maxLength = 80) {
 function anonymizeIdentifier(value: string) {
   const secret =
     process.env.AI_RATE_LIMIT_SECRET?.trim() ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    'flore-atelier-ai'
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+
+  if (!secret) {
+    throw new AiConfigurationError()
+  }
 
   return createHmac('sha256', secret).update(value).digest('hex')
 }
@@ -191,6 +217,293 @@ async function fetchWithTimeout(
   }
 }
 
+function cloudflareConfigured() {
+  return Boolean(
+    process.env.CLOUDFLARE_ACCOUNT_ID?.trim() &&
+    process.env.CLOUDFLARE_API_TOKEN?.trim()
+  )
+}
+
+function referenceHostAllowlist() {
+  const hosts = new Set<string>()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+
+  if (supabaseUrl) {
+    try {
+      hosts.add(new URL(supabaseUrl).hostname.toLowerCase())
+    } catch {
+      // createServiceClient will surface the invalid Supabase URL separately.
+    }
+  }
+
+  for (const entry of (process.env.ATELIER_AI_REFERENCE_HOSTS || '').split(
+    ','
+  )) {
+    const value = entry.trim()
+    if (!value) continue
+
+    try {
+      const url = new URL(value.includes('://') ? value : `https://${value}`)
+      hosts.add(url.hostname.toLowerCase())
+    } catch {
+      console.warn('[atelier-ai] ignored invalid reference host', value)
+    }
+  }
+
+  return hosts
+}
+
+function trustedReferenceUrl(value: string | null | undefined) {
+  if (!value) return null
+
+  try {
+    const url = new URL(value)
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      !referenceHostAllowlist().has(url.hostname.toLowerCase())
+    ) {
+      return null
+    }
+
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+function trustedPreviousPreviewUrl(value: string | undefined) {
+  const trusted = trustedReferenceUrl(value)
+  if (!trusted) return null
+
+  const url = new URL(trusted)
+  return url.pathname.startsWith(`/storage/v1/object/public/${PREVIEW_BUCKET}/`)
+    ? trusted
+    : null
+}
+
+async function downloadReferenceImage(value: string) {
+  const trusted = trustedReferenceUrl(value)
+  if (!trusted) return null
+
+  const response = await fetchWithTimeout(
+    trusted,
+    {
+      headers: { Accept: 'image/avif,image/webp,image/jpeg,image/png' },
+      redirect: 'error',
+    },
+    6_000
+  )
+  const contentType = response.headers.get('content-type') || ''
+  const contentLength = Number(response.headers.get('content-length') || '0')
+
+  if (
+    !response.ok ||
+    !contentType.startsWith('image/') ||
+    contentLength > MAX_REFERENCE_BYTES
+  ) {
+    return null
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer())
+  if (buffer.length === 0 || buffer.length > MAX_REFERENCE_BYTES) return null
+
+  return buffer
+}
+
+async function normalizeReferenceImage(
+  source: Buffer,
+  width = REFERENCE_SIZE,
+  height = REFERENCE_SIZE
+) {
+  return sharp(source, { limitInputPixels: 20_000_000 })
+    .rotate()
+    .flatten({ background: '#ffffff' })
+    .resize(width, height, {
+      fit: 'contain',
+      background: '#ffffff',
+      withoutEnlargement: false,
+    })
+    .jpeg({ quality: 86, chromaSubsampling: '4:4:4' })
+    .toBuffer()
+}
+
+async function buildReferenceBoard(values: Array<string | null | undefined>) {
+  const urls = Array.from(
+    new Set(
+      values.map(trustedReferenceUrl).filter((url): url is string => !!url)
+    )
+  ).slice(0, 4)
+
+  if (urls.length === 0) return null
+
+  const downloads = await Promise.allSettled(urls.map(downloadReferenceImage))
+  const images: Buffer[] = []
+
+  for (const result of downloads) {
+    if (result.status === 'fulfilled' && result.value) {
+      images.push(Buffer.from(result.value))
+    }
+  }
+
+  if (images.length === 0) return null
+
+  const columns = images.length === 1 ? 1 : 2
+  const rows = Math.ceil(images.length / columns)
+  const tileWidth = Math.floor(REFERENCE_SIZE / columns)
+  const tileHeight = Math.floor(REFERENCE_SIZE / rows)
+  const padding = 6
+  const tiles = await Promise.all(
+    images.map((image) =>
+      normalizeReferenceImage(
+        image,
+        tileWidth - padding * 2,
+        tileHeight - padding * 2
+      )
+    )
+  )
+
+  return sharp({
+    create: {
+      width: REFERENCE_SIZE,
+      height: REFERENCE_SIZE,
+      channels: 3,
+      background: '#f7f3ed',
+    },
+  })
+    .composite(
+      tiles.map((input, index) => ({
+        input,
+        left: (index % columns) * tileWidth + padding,
+        top: Math.floor(index / columns) * tileHeight + padding,
+      }))
+    )
+    .jpeg({ quality: 88, chromaSubsampling: '4:4:4' })
+    .toBuffer()
+}
+
+async function prepareReferences(
+  selection: BouquetSelection,
+  previousImageUrl: string | undefined
+) {
+  const dominantFlowers = [...selection.flowers]
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 4)
+  const containerUrl = trustedReferenceUrl(selection.container?.image)
+  const previousUrl = trustedPreviousPreviewUrl(previousImageUrl)
+
+  const prepareSingle = async (
+    url: string | null,
+    purpose: PreparedReference['purpose']
+  ): Promise<PreparedReference | null> => {
+    if (!url) return null
+
+    try {
+      const downloaded = await downloadReferenceImage(url)
+      return downloaded
+        ? { buffer: await normalizeReferenceImage(downloaded), purpose }
+        : null
+    } catch (error) {
+      console.warn(`[atelier-ai] ${purpose} reference failed`, error)
+      return null
+    }
+  }
+
+  const [flowerBoard, greeneryBoard, containerReference, previousReference] =
+    await Promise.all([
+      buildReferenceBoard(dominantFlowers.map((item) => item.image)),
+      buildReferenceBoard(selection.greenery.map((item) => item.image)),
+      prepareSingle(containerUrl, 'container'),
+      prepareSingle(previousUrl, 'previous'),
+    ])
+
+  const references: PreparedReference[] = []
+  if (flowerBoard) references.push({ buffer: flowerBoard, purpose: 'flowers' })
+  if (greeneryBoard)
+    references.push({ buffer: greeneryBoard, purpose: 'greenery' })
+  if (containerReference) references.push(containerReference)
+  if (previousReference) references.push(previousReference)
+
+  return references.slice(0, 4)
+}
+
+function selectionCacheHash(selection: BouquetSelection) {
+  const stableSelection = {
+    version: PROMPT_VERSION,
+    provider: cloudflareConfigured() ? PRIMARY_MODEL : 'pollinations',
+    flowers: [...selection.flowers]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map(({ id, qty, name, color, image }) => ({
+        id,
+        qty,
+        name: cleanPromptText(name),
+        color: cleanPromptText(color, 30),
+        image,
+      })),
+    greenery: [...selection.greenery]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map(({ id, qty, name, image }) => ({
+        id,
+        qty,
+        name: cleanPromptText(name),
+        image,
+      })),
+    container: selection.container
+      ? {
+          id: selection.container.id,
+          name: cleanPromptText(selection.container.name),
+          type: selection.container.container_type,
+          image: selection.container.image,
+        }
+      : null,
+    size: selection.size
+      ? { key: selection.size.key, stemCount: selection.size.stem_count }
+      : null,
+    greeneryPreference: selection.greeneryPreference,
+    spacingPreference: selection.spacingPreference,
+  }
+
+  return createHash('sha256')
+    .update(JSON.stringify(stableSelection))
+    .digest('hex')
+}
+
+function cacheFolder() {
+  return `cache/${PROMPT_VERSION}`
+}
+
+function cachedFilePath(hash: string) {
+  return `${cacheFolder()}/${hash}.jpg`
+}
+
+async function findCachedPreview(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  hash: string
+) {
+  const fileName = `${hash}.jpg`
+  const { data, error } = await serviceClient.storage
+    .from(PREVIEW_BUCKET)
+    .list(cacheFolder(), { limit: 1, search: fileName })
+
+  if (error) {
+    console.warn('[atelier-ai] cache lookup failed', error)
+    return null
+  }
+
+  return data?.some((item) => item.name === fileName)
+    ? cachedFilePath(hash)
+    : null
+}
+
+function publicPreviewUrl(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  path: string
+) {
+  return serviceClient.storage.from(PREVIEW_BUCKET).getPublicUrl(path).data
+    .publicUrl
+}
+
 function decodeBase64Image(value: string) {
   const encoded = value.includes(',')
     ? value.slice(value.indexOf(',') + 1)
@@ -235,14 +548,22 @@ async function generateWithFlux2(
   apiToken: string,
   prompt: string,
   seed: number,
-  timeoutMs: number
+  timeoutMs: number,
+  references: PreparedReference[]
 ): Promise<GeneratedImage> {
   const form = new FormData()
   form.set('prompt', prompt)
-  form.set('width', '768')
+  form.set('width', '1024')
   form.set('height', '1024')
   form.set('guidance', '4')
   form.set('seed', String(seed))
+  references.forEach((reference, index) => {
+    form.set(
+      `input_image_${index}`,
+      new Blob([new Uint8Array(reference.buffer)], { type: 'image/jpeg' }),
+      `${reference.purpose}.jpg`
+    )
+  })
 
   const response = await fetchWithTimeout(
     cloudflareEndpoint(accountId, PRIMARY_MODEL),
@@ -257,6 +578,7 @@ async function generateWithFlux2(
   return {
     buffer: await readCloudflareImage(response),
     model: 'FLUX.2 Klein 4B',
+    referencesUsed: references.length,
   }
 }
 
@@ -283,6 +605,7 @@ async function generateWithFlux1(
   return {
     buffer: await readCloudflareImage(response),
     model: 'FLUX.1 Schnell',
+    referencesUsed: 0,
   }
 }
 
@@ -293,7 +616,7 @@ async function generateWithPollinations(
 ): Promise<GeneratedImage> {
   const url =
     `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
-    `?width=768&height=1024&seed=${seed}&nologo=true&enhance=true`
+    `?width=1024&height=1024&seed=${seed}&nologo=true&enhance=true`
   const response = await fetchWithTimeout(
     url,
     { headers: { Accept: 'image/*' } },
@@ -318,10 +641,14 @@ async function generateWithPollinations(
     throw new AiProviderError('The provider returned an invalid image', 502)
   }
 
-  return { buffer, model: 'Pollinations fallback' }
+  return { buffer, model: 'Pollinations fallback', referencesUsed: 0 }
 }
 
-async function generateImage(prompt: string, seed: number) {
+async function generateImage(
+  prompt: string,
+  seed: number,
+  references: PreparedReference[]
+) {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
   const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim()
   const allowPublicFallback = publicFallbackEnabled()
@@ -345,7 +672,8 @@ async function generateImage(prompt: string, seed: number) {
         apiToken,
         prompt,
         seed,
-        remainingTime()
+        remainingTime(),
+        references
       )
     } catch (primaryError) {
       console.warn('[atelier-ai] FLUX.2 generation failed', primaryError)
@@ -425,6 +753,7 @@ function containerDescription(container: ContainerRow | null) {
     case 'basket':
       return `a premium ${name || 'natural woven flower basket'}`
     case 'glass_vase':
+    case 'vase':
       return `a clean premium ${name || 'clear glass vase'}`
     case 'luxury_box':
       return `an elegant ${name || 'luxury flower box'}`
@@ -441,7 +770,10 @@ function bouquetScale(size: SizeRow | null, selectedStems: number) {
   return 'abundant and statement-sized'
 }
 
-function buildBouquetPrompt(selection: BouquetSelection) {
+function buildBouquetPrompt(
+  selection: BouquetSelection,
+  references: PreparedReference[]
+) {
   const selectedStems = selection.flowers.reduce(
     (sum, flower) => sum + flower.qty,
     0
@@ -468,14 +800,48 @@ function buildBouquetPrompt(selection: BouquetSelection) {
           })
           .join('; ')
           .slice(0, 240)
-      : 'minimal subtle florist foliage only where structurally necessary'
+      : 'NO decorative greenery. Do not add eucalyptus, baby’s breath, fern, ruscus, filler flowers, or unlisted foliage'
+
+  const greeneryAdjustment =
+    selection.greenery.length === 0
+      ? 'Keep decorative greenery completely absent.'
+      : selection.greeneryPreference === 'less'
+        ? 'Use visibly less greenery than a typical florist arrangement while keeping every selected greenery species.'
+        : selection.greeneryPreference === 'more'
+          ? 'Use a fuller amount of the selected greenery species without hiding the flower heads.'
+          : 'Use the selected greenery in a balanced natural amount.'
+
+  const spacingAdjustment =
+    selection.spacingPreference === 'compact'
+      ? 'Arrange flower heads closer together in a compact florist silhouette.'
+      : selection.spacingPreference === 'airy'
+        ? 'Create a slightly wider, airier florist silhouette with believable spacing and no missing stems.'
+        : 'Use balanced professional florist spacing.'
+
+  const referenceInstructions = references.map((reference, index) => {
+    const imageNumber = index + 1
+
+    switch (reference.purpose) {
+      case 'flowers':
+        return `Reference image ${imageNumber} is a flower identity board. Match its real petal shapes, species, and colors; do not reproduce the board layout or background.`
+      case 'greenery':
+        return `Reference image ${imageNumber} is a greenery identity board. Match only the selected leaf shapes and natural colors.`
+      case 'container':
+        return `Reference image ${imageNumber} shows the exact container or wrapping style. Preserve its material, color, and recognizable silhouette.`
+      case 'previous':
+        return `Reference image ${imageNumber} is the previous generated bouquet. Preserve its camera angle, container, flower identities, and overall composition; change only the requested greenery density or spacing and keep the result photographic.`
+    }
+  })
 
   return [
-    'Ultra-photorealistic vertical luxury e-commerce product photograph of ONE real florist-made bouquet, centered and fully visible.',
+    'Ultra-photorealistic square luxury e-commerce product photograph of ONE real florist-made bouquet, centered and fully visible.',
     'Exactly one bouquet. No people, hands, text, letters, logo, watermark, price tag, duplicate bouquet, extra container, illustration, CGI, or surreal elements.',
+    ...referenceInstructions,
     `Bouquet scale: ${bouquetScale(selection.size, selectedStems)}.`,
     `Required flower recipe: ${flowerRecipe}.`,
     `Greenery recipe: ${greeneryRecipe}.`,
+    greeneryAdjustment,
+    spacingAdjustment,
     `Presentation: ${containerDescription(selection.container)}.`,
     'Closely preserve the listed flower species, colors, relative quantities, greenery, and container. Do not invent other flower species or colors.',
     'Natural botanical anatomy, individually distinct petals, believable stems and leaves, tiny organic imperfections, fresh hydrated flowers, professional Jordanian luxury florist craftsmanship.',
@@ -487,11 +853,7 @@ function buildBouquetPrompt(selection: BouquetSelection) {
 }
 
 function providerConfigured() {
-  const cloudflareConfigured = Boolean(
-    process.env.CLOUDFLARE_ACCOUNT_ID?.trim() &&
-    process.env.CLOUDFLARE_API_TOKEN?.trim()
-  )
-  return cloudflareConfigured || publicFallbackEnabled()
+  return cloudflareConfigured() || publicFallbackEnabled()
 }
 
 function userFacingProviderError(error: unknown) {
@@ -541,6 +903,19 @@ export async function GET(request: NextRequest) {
 
   try {
     const identifier = await usageIdentifier(request)
+    const atomicQuota = await getAtelierDailyQuota(identifier)
+
+    if (atomicQuota) {
+      return NextResponse.json(
+        {
+          configured: true,
+          remaining: atomicQuota.remaining,
+          limit: atomicQuota.limit,
+        },
+        { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+      )
+    }
+
     const serviceClient = createServiceClient()
     const { count, error } = await serviceClient
       .from('ai_generation_logs')
@@ -605,7 +980,16 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { flowers, greenery, containerId, sizeKey } = parsed.data
+  const {
+    flowers,
+    greenery,
+    containerId,
+    sizeKey,
+    greeneryPreference,
+    spacingPreference,
+    regenerate,
+    previousImageUrl,
+  } = parsed.data
   const totalFlowers = flowers.reduce((sum, flower) => sum + flower.qty, 0)
   const flowerIds = flowers.map((flower) => flower.id)
   const greeneryIds = greenery.map((item) => item.id)
@@ -613,7 +997,10 @@ export async function POST(request: NextRequest) {
   if (
     totalFlowers > 200 ||
     new Set(flowerIds).size !== flowerIds.length ||
-    new Set(greeneryIds).size !== greeneryIds.length
+    new Set(greeneryIds).size !== greeneryIds.length ||
+    !containerId ||
+    (previousImageUrl && !regenerate) ||
+    (previousImageUrl && !trustedPreviousPreviewUrl(previousImageUrl))
   ) {
     return NextResponse.json(
       { error: 'اختيارات الباقة غير صالحة.' },
@@ -638,47 +1025,24 @@ export async function POST(request: NextRequest) {
   const rateLimitResponse = await checkRateLimit(identifier, 'ai')
   if (rateLimitResponse) return rateLimitResponse
 
-  const limit = dailyLimit()
-  const { count, error: countError } = await serviceClient
-    .from('ai_generation_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('identifier', identifier)
-    .gte('created_at', usageWindowStart())
-
-  if (countError) {
-    console.error('[atelier-ai] usage query failed', countError)
-    return NextResponse.json(
-      { error: 'تعذر التحقق من المحاولات المتبقية.' },
-      { status: 503 }
-    )
-  }
-
-  const usedCount = count || 0
-  if (usedCount >= limit) {
-    return NextResponse.json(
-      { error: 'انتهت معايناتك المجانية لهذا اليوم.', remaining: 0 },
-      { status: 429 }
-    )
-  }
-
   const [flowersResult, greeneryResult, containerResult, sizeResult] =
     await Promise.all([
       serviceClient
         .from('flower_types')
-        .select('id, name, name_ar, color')
+        .select('id, name, name_ar, color, image')
         .in('id', flowerIds)
         .eq('in_stock', true),
       greeneryIds.length
         ? serviceClient
             .from('greenery_options')
-            .select('id, name, name_ar')
+            .select('id, name, name_ar, image')
             .in('id', greeneryIds)
             .eq('in_stock', true)
         : Promise.resolve({ data: [], error: null }),
       containerId
         ? serviceClient
             .from('vase_options')
-            .select('id, name, name_ar, container_type')
+            .select('id, name, name_ar, container_type, image')
             .eq('id', containerId)
             .eq('in_stock', true)
             .maybeSingle()
@@ -734,21 +1098,124 @@ export async function POST(request: NextRequest) {
     })),
     container,
     size,
+    greeneryPreference,
+    spacingPreference,
   }
 
-  const prompt = buildBouquetPrompt(selection)
+  const cacheHash = selectionCacheHash(selection)
+
+  if (!regenerate) {
+    const cachedPath = await findCachedPreview(serviceClient, cacheHash)
+
+    if (cachedPath) {
+      const atomicQuota = await getAtelierDailyQuota(identifier)
+      let limit = atomicQuota?.limit || dailyLimit()
+      let remaining = atomicQuota?.remaining
+
+      if (remaining === undefined) {
+        const { count, error: countError } = await serviceClient
+          .from('ai_generation_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('identifier', identifier)
+          .gte('created_at', usageWindowStart())
+
+        if (!countError) {
+          remaining = Math.max(0, limit - (count || 0))
+        } else {
+          console.warn('[atelier-ai] cached quota lookup failed', countError)
+          remaining = limit
+        }
+      }
+
+      return NextResponse.json(
+        {
+          imageUrl: publicPreviewUrl(serviceClient, cachedPath),
+          model: cloudflareConfigured()
+            ? 'FLUX.2 Klein 4B'
+            : 'Pollinations fallback',
+          remaining,
+          limit,
+          cached: true,
+          referencesUsed: 0,
+        },
+        {
+          headers: {
+            'Cache-Control': 'no-store, max-age=0',
+            'X-Content-Type-Options': 'nosniff',
+          },
+        }
+      )
+    }
+  }
+
+  let limit = dailyLimit()
+  let usedCount = 0
+  let remainingAfterAttempt: number
+  let quotaIsAtomic = false
+  const atomicReservation = await consumeAtelierDailyQuota(identifier)
+
+  if (atomicReservation) {
+    limit = atomicReservation.limit
+    remainingAfterAttempt = atomicReservation.remaining
+    quotaIsAtomic = true
+
+    if (!atomicReservation.success) {
+      return NextResponse.json(
+        { error: 'انتهت معايناتك المجانية لهذا اليوم.', remaining: 0 },
+        { status: 429 }
+      )
+    }
+  } else {
+    const { count, error: countError } = await serviceClient
+      .from('ai_generation_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('identifier', identifier)
+      .gte('created_at', usageWindowStart())
+
+    if (countError) {
+      console.error('[atelier-ai] usage query failed', countError)
+      return NextResponse.json(
+        { error: 'تعذر التحقق من المحاولات المتبقية.' },
+        { status: 503 }
+      )
+    }
+
+    usedCount = count || 0
+    if (usedCount >= limit) {
+      return NextResponse.json(
+        { error: 'انتهت معايناتك المجانية لهذا اليوم.', remaining: 0 },
+        { status: 429 }
+      )
+    }
+
+    remainingAfterAttempt = Math.max(0, limit - usedCount - 1)
+  }
+
+  let references: PreparedReference[] = []
+  try {
+    references = await prepareReferences(
+      selection,
+      regenerate ? previousImageUrl : undefined
+    )
+  } catch (error) {
+    console.warn('[atelier-ai] reference preparation failed', error)
+  }
+
+  const prompt = buildBouquetPrompt(selection, references)
   const seed = Math.floor(Math.random() * 2_147_483_647)
   let generated: GeneratedImage
 
   try {
-    generated = await generateImage(prompt, seed)
+    generated = await generateImage(prompt, seed, references)
   } catch (error) {
     console.error('[atelier-ai] generation failed', error)
     const userError = userFacingProviderError(error)
     return NextResponse.json(
       {
         error: userError.message,
-        remaining: Math.max(0, limit - usedCount),
+        remaining: quotaIsAtomic
+          ? remainingAfterAttempt
+          : Math.max(0, limit - usedCount),
       },
       { status: userError.status }
     )
@@ -758,6 +1225,7 @@ export async function POST(request: NextRequest) {
   try {
     normalizedBuffer = await sharp(generated.buffer)
       .rotate()
+      .resize(1024, 1024, { fit: 'cover', position: 'centre' })
       .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
       .toBuffer()
   } catch (error) {
@@ -769,21 +1237,39 @@ export async function POST(request: NextRequest) {
   }
 
   const dateFolder = new Date().toISOString().slice(0, 10)
-  const fileName = `${dateFolder}/preview-${Date.now()}-${seed}.jpg`
+  const shouldCache =
+    !regenerate &&
+    (generated.model === 'FLUX.2 Klein 4B' || !cloudflareConfigured())
+  let fileName = shouldCache
+    ? cachedFilePath(cacheHash)
+    : `previews/${dateFolder}/preview-${Date.now()}-${seed}.jpg`
+  let servedFromExistingCache = false
   const { error: uploadError } = await serviceClient.storage
     .from(PREVIEW_BUCKET)
     .upload(fileName, normalizedBuffer, {
       contentType: 'image/jpeg',
-      cacheControl: '604800',
+      cacheControl: shouldCache ? '31536000' : '604800',
       upsert: false,
     })
 
   if (uploadError) {
-    console.error('[atelier-ai] image upload failed', uploadError)
-    return NextResponse.json(
-      { error: 'تم إنشاء الصورة لكن تعذر حفظها. حاول مرة أخرى.' },
-      { status: 503 }
-    )
+    const existingPath = shouldCache
+      ? await findCachedPreview(serviceClient, cacheHash)
+      : null
+
+    if (existingPath) {
+      fileName = existingPath
+      servedFromExistingCache = true
+    } else {
+      console.error('[atelier-ai] image upload failed', uploadError)
+      return NextResponse.json(
+        {
+          error: 'تم إنشاء الصورة لكن تعذر حفظها. حاول مرة أخرى.',
+          remaining: remainingAfterAttempt,
+        },
+        { status: 503 }
+      )
+    }
   }
 
   const { error: logError } = await serviceClient
@@ -792,22 +1278,25 @@ export async function POST(request: NextRequest) {
 
   if (logError) {
     console.error('[atelier-ai] usage log failed', logError)
-    await serviceClient.storage.from(PREVIEW_BUCKET).remove([fileName])
-    return NextResponse.json(
-      { error: 'تعذر تسجيل المعاينة. حاول مرة أخرى.' },
-      { status: 503 }
-    )
+    if (!quotaIsAtomic) {
+      if (!servedFromExistingCache) {
+        await serviceClient.storage.from(PREVIEW_BUCKET).remove([fileName])
+      }
+      return NextResponse.json(
+        { error: 'تعذر تسجيل المعاينة. حاول مرة أخرى.' },
+        { status: 503 }
+      )
+    }
   }
-
-  const {
-    data: { publicUrl },
-  } = serviceClient.storage.from(PREVIEW_BUCKET).getPublicUrl(fileName)
 
   return NextResponse.json(
     {
-      imageUrl: publicUrl,
+      imageUrl: publicPreviewUrl(serviceClient, fileName),
       model: generated.model,
-      remaining: Math.max(0, limit - usedCount - 1),
+      remaining: remainingAfterAttempt,
+      limit,
+      cached: servedFromExistingCache,
+      referencesUsed: generated.referencesUsed,
     },
     {
       headers: {

@@ -129,7 +129,9 @@ npm run test:ui
 
 The Atelier uses Cloudflare Workers AI with `FLUX.2 Klein 4B` as its primary image model and automatically falls back to the existing no-key Pollinations provider. Add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to the server or Vercel environment for the highest-quality path; never expose the token with a `NEXT_PUBLIC_` prefix.
 
-Generated previews are normalized to JPEG and saved in the public Supabase Storage bucket `atelier-previews`. Successful usage is counted in `ai_generation_logs` using an anonymized user/IP identifier, so the existing bucket, table, and `SUPABASE_SERVICE_ROLE_KEY` must be available.
+Generated previews are normalized to square JPEGs and saved in the public Supabase Storage bucket `atelier-previews`. FLUX.2 receives safe, resized reference boards built from the selected inventory images stored in Supabase, which materially improves flower and container fidelity. Identical first previews are cached by a deterministic selection hash; “new version” requests use the previous preview as a fourth reference.
+
+Successful usage is recorded in `ai_generation_logs` with an anonymized user/IP identifier. When Upstash is configured, the daily quota is reserved atomically across serverless instances; otherwise the route uses the existing Supabase usage-log fallback. Keep reference downloads restricted to your Supabase hostname. Add external hosts to `ATELIER_AI_REFERENCE_HOSTS` only when you fully trust them.
 
 ## 🎨 Design System
 
