@@ -23,16 +23,21 @@ export interface CartItem {
   quantity: number;
   customization?: {
     flowers: string[];
+    greenery?: string[];
+    container?: string;
     wrap: string;
     vase: string;
     message?: string;
   };
   bouquetSelection?: {
     flowers: { id: string; qty: number }[];
-    greenery?: { id: string; qty: number }[];
-    wrapId: string | null;
-    vaseId: string | null;
-    sizeKey?: string;
+    greenery: { id: string; qty: number }[];
+    containerId: string | null;
+    sizeKey: string;
+    /** @deprecated Legacy fields kept for old persisted carts during migration. */
+    wrapId?: string | null;
+    /** @deprecated Legacy fields kept for old persisted carts during migration. */
+    vaseId?: string | null;
   };
 }
 
@@ -44,6 +49,8 @@ export interface OrderItem {
   qty: number;
   customization?: {
     flowers: string[];
+    greenery?: string[];
+    container?: string;
     wrap: string;
     vase: string;
     message?: string;
@@ -60,7 +67,7 @@ export interface Order {
   payment_status: string;
   payment_transaction_id: string | null;
   stripe_session_id: string | null;
-  delivery_address: string;
+  delivery_address: string | null;
   delivery_region: string | null;
   delivery_notes: string | null;
   delivery_time_slot: string | null;
@@ -70,6 +77,7 @@ export interface Order {
   is_anonymous_gift: boolean;
   awaiting_recipient_address: boolean;
   recipient_name: string | null;
+  recipient_phone?: string | null;
   recipient_address_token: string | null;
   driver_id: string | null;
   driver_lat: number | null;
