@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-# إلغاء تشغيل خطوط الأنابيب القديمة لنفس الفرع إذا تم دفع كود جديد لتوفير موارد الحساب
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -22,8 +21,8 @@ jobs:
       - name: 2. Setup Node.js Environment
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm' # تفعيل كاش npm تلقائياً لتسريع خطوات التثبيت القادمة
+          node-version: '22'
+          cache: 'npm'
 
       - name: 3. Install Production Dependencies
         run: npm ci
@@ -35,15 +34,16 @@ jobs:
         run: npm run lint
 
       - name: 6. Run Automated Testing Suite
-        run: npm run test
+        run: npm run test -- --run
         env:
-          CI: true # فرض متغير البيئة لضمان تشغيل Vitest مرة واحدة (Single Run) وعدم التعليق في الـ Watch Mode
+          CI: true
 
       - name: 7. Build Production Bundle
         run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
@@ -52,4 +52,4 @@ jobs:
           NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
           NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # تأمين بناء صفحات مستشار الـ AI دون انقطاع
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
