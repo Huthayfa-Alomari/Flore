@@ -31,9 +31,9 @@ export interface CartItem {
   };
   bouquetSelection?: {
     flowers: { id: string; qty: number }[];
-    greenery: { id: string; qty: number }[];
-    containerId: string | null;
-    sizeKey: string;
+    greenery?: { id: string; qty: number }[];
+    containerId?: string | null;
+    sizeKey?: string;
     /** @deprecated Legacy fields kept for old persisted carts during migration. */
     wrapId?: string | null;
     /** @deprecated Legacy fields kept for old persisted carts during migration. */
