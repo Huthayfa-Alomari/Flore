@@ -185,7 +185,7 @@ export function CheckoutExperience() {
         const paymentResponse = await fetch('/api/payment/paytabs/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId }),
+          body: JSON.stringify({ orderId, trackingToken }),
         })
         const paymentData = await paymentResponse.json()
         if (!paymentResponse.ok) throw new Error(typeof paymentData?.error === 'string' ? paymentData.error : 'تعذر بدء الدفع بالبطاقة.')
