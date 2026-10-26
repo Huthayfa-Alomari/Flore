@@ -1,0 +1,216 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════
+   FLORÉ — Kinsei Light Luxury Design System
+   Ivory · Deep Sage · Champagne Gold · Charcoal Ink
+   Motion: subtle & elegant (200–300ms)
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+    /* ── Brand ── */
+    --flore-primary: #5E7261;          /* deep sage — buttons, links, active */
+    --flore-primary-dark: #4B5D4D;      /* sage hover (darkens) */
+    --flore-gold: #CBB47F;              /* champagne gold — accents */
+    --flore-gold-dark: #AB915D;        /* deep champagne */
+
+    /* ── Surfaces ── */
+    --flore-bg: #FAF9F5;               /* warm ivory */
+    --flore-bg-alt: #F2F0E9;           /* deeper section ivory */
+    --flore-card: #FFFFFF;
+    --flore-subtle: #EFF1EB;           /* sage-tinted fill */
+    --flore-sage: #A9B8A5;             /* decorative sage */
+    --flore-blush: #F0E2DD;            /* dusty blush tint */
+    --flore-blush-deep: #C7A8A0;
+
+    /* ── Ink ── */
+    --flore-text-primary: #2B2B27;      /* charcoal */
+    --flore-text-secondary: #6E6E66;    /* soft stone */
+
+    /* ── Lines & Depth ── */
+    --flore-border: #E8E5DD;            /* warm hairline */
+    --flore-shadow:
+        0 1px 2px rgba(43, 43, 39, 0.03),
+        0 12px 40px -12px rgba(43, 43, 39, 0.10);
+    --flore-shadow-hover:
+        0 2px 4px rgba(43, 43, 39, 0.04),
+        0 24px 56px -16px rgba(43, 43, 39, 0.16);
+    --flore-shadow-soft:
+        0 1px 2px rgba(43, 43, 39, 0.02),
+        0 6px 20px -8px rgba(43, 43, 39, 0.07);
+
+    /* ── Status (muted, never harsh) ── */
+    --flore-success: #5A7D5E;
+    --flore-error: #B2504A;
+    --flore-warning: #B08A4F;
+}
+
+[data-theme="dark"] {
+    --flore-primary: #5D7965;          /* sage kept deep for white-on-sage buttons */
+    --flore-primary-dark: #6F8B77;     /* hover lightens in dark */
+    --flore-gold: #D2B985;             /* champagne brightens */
+    --flore-gold-dark: #E0CC9A;
+
+    --flore-bg: #161916;               /* green-black */
+    --flore-bg-alt: #1B1F1B;
+    --flore-card: #1F2420;
+    --flore-subtle: #272D28;
+    --flore-sage: #55645A;
+    --flore-blush: #2C2624;
+    --flore-blush-deep: #8A7069;
+
+    --flore-text-primary: #EBE9E1;     /* warm cream */
+    --flore-text-secondary: #A2A398;
+
+    --flore-border: #2F3530;
+    --flore-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.20),
+        0 12px 40px -12px rgba(0, 0, 0, 0.45);
+    --flore-shadow-hover:
+        0 2px 4px rgba(0, 0, 0, 0.25),
+        0 24px 56px -16px rgba(0, 0, 0, 0.55);
+    --flore-shadow-soft:
+        0 1px 2px rgba(0, 0, 0, 0.15),
+        0 6px 20px -8px rgba(0, 0, 0, 0.35);
+
+    --flore-success: #7FA983;
+    --flore-error: #C97A74;
+    --flore-warning: #C9A96B;
+}
+
+@layer base {
+    * {
+        @apply border-flore-border;
+    }
+
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        @apply bg-flore-bg text-flore-text-primary;
+        font-feature-settings: "kern" 1;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        @apply font-amiri;
+        letter-spacing: -0.01em;
+    }
+
+    ::selection {
+        background: var(--flore-gold);
+        color: #2B2B27;
+    }
+
+    /* Accessible focus — visible, elegant */
+    :focus-visible {
+        outline: 2px solid var(--flore-primary);
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+}
+
+@layer components {
+    /* Page container — generous, calm */
+    .flore-container {
+        @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+    }
+
+    /* The signature eyebrow label above headings */
+    .flore-eyebrow {
+        font-family: var(--font-display), Georgia, serif;
+        @apply text-xs uppercase;
+        letter-spacing: 0.38em;
+        color: var(--flore-gold-dark);
+        direction: ltr;
+        text-align: center;
+    }
+    .flore-eyebrow-right {
+        text-align: right;
+    }
+
+    /* Section rhythm — spacious (density 3/10) */
+    .flore-section {
+        @apply py-16 md:py-24;
+    }
+
+    /* Hairline divider with a diamond accent */
+    .flore-divider {
+        @apply flex items-center gap-4;
+    }
+    .flore-divider::before,
+    .flore-divider::after {
+        content: "";
+        @apply flex-1 h-px;
+        background: var(--flore-border);
+    }
+
+    /* Card hover — the only motion we allow ourselves */
+    .flore-lift {
+        transition: transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
+            box-shadow 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+    .flore-lift:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--flore-shadow-hover);
+    }
+}
+
+@layer utilities {
+    .text-balance {
+        text-wrap: balance;
+    }
+    .safe-area-pb {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .safe-area-pt {
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+}
+
+/* ── Elegant scrollbar ── */
+::-webkit-scrollbar {
+    width: 10px;
+}
+::-webkit-scrollbar-track {
+    background: var(--flore-bg);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--flore-sage);
+    border-radius: 8px;
+    border: 2px solid var(--flore-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--flore-primary);
+}
+
+/* ── Model viewer ── */
+model-viewer {
+    width: 100%;
+    height: 400px;
+    --poster-color: transparent;
+    background-color: var(--flore-bg-alt);
+    border-radius: 1.25rem;
+}
+
+/* ── Respect reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ── RTL number rendering (prices) ── */
+.flore-price {
+    direction: ltr;
+    unicode-bidi: embed;
+    display: inline-block;
+}
