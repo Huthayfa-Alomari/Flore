@@ -63,7 +63,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-flore-bg pb-24" dir="rtl">
+    <div className="flore-cart-page min-h-screen bg-flore-bg pb-24" dir="rtl">
       <div className="max-w-3xl mx-auto px-4 py-10 md:py-14">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
