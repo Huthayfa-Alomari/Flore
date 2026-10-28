@@ -488,3 +488,30 @@ table { font-variant-numeric: tabular-nums; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+
+/* Final component consistency */
+.flore-catalog-page button,
+.flore-atelier-page button,
+.flore-cart-page button,
+.flore-checkout-page button,
+.flore-profile-page button,
+.flore-login-page button,
+.flore-admin-page button,
+.flore-admin-products-page button,
+.flore-admin-orders-page button { border-radius: var(--flore-radius-control); }
+.flore-site-footer {
+  background:
+    radial-gradient(ellipse at 95% 0%, color-mix(in srgb, var(--flore-sage) 13%, transparent), transparent 42%),
+    var(--flore-bg-alt);
+}
+.flore-site-footer a { text-underline-offset: 4px; }
+.flore-site-footer a:focus-visible { outline-offset: 4px; }
+.flore-site-footer > div { max-width: 1440px; }
+@media (hover: hover) and (pointer: fine) {
+  .flore-catalog-page button:hover,
+  .flore-atelier-page button:hover,
+  .flore-cart-page button:hover,
+  .flore-checkout-page button:hover,
+  .flore-profile-page button:hover { transform: translateY(-1px); }
+}
