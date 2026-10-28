@@ -26,4 +26,4 @@ The Atelier daily quota uses the `claim_ai_generation` RPC from migration 006 to
 
 ## 3D model assets
 
-The archive includes five GLB files and PBR textures under `public/models/`. The repository's text-only integration environment cannot transfer those binary assets into GitHub directly, so keep AR disabled until the files have been copied into the same paths and committed. Do not enable `ar_enabled` in production while the referenced files return 404.
+The handoff archive includes five GLB files and PBR textures under `public/models/`. Copy those binary assets into the same paths and commit them before enabling AR. Keep `ar_enabled` false in production while the referenced files return 404.
