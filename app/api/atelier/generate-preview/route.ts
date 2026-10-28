@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { checkRateLimit, getClientIp, isRateLimitConfigured } from '@/lib/rate-limit'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import sharp from 'sharp'
@@ -115,11 +115,23 @@ async function generateWithPollinations(prompt: string): Promise<Buffer> {
 }
 
 export async function POST(request: NextRequest) {
-  if (process.env.NODE_ENV === 'production' && !isRateLimitConfigured()) {
-    return NextResponse.json({ error: 'معاينة الباقة غير متاحة مؤقتًا. يرجى المحاولة لاحقًا.' }, { status: 503 })
+  // Distributed per-minute limiting is applied when Upstash is configured.
+  // The atomic database quota below remains the authoritative hard cap (5 generations
+  // per identifier per UTC day), so missing optional Upstash credentials alone must
+  // not disable the Atelier preview feature in production.
+  try {
+    const rateLimitResponse = await checkRateLimit(getClientIp(request), 'strict')
+    if (rateLimitResponse) return rateLimitResponse
+  } catch (error) {
+    // Fail closed if a configured limiter errors; do not silently bypass it.
+    console.error('[atelier] Rate-limit check failed:', error instanceof Error ? error.message : 'unknown')
+    return NextResponse.json({ error: 'خدمة المعاينة مشغولة مؤقتًا. حاول بعد قليل.' }, { status: 503 })
   }
-  const rateLimitResponse = await checkRateLimit(getClientIp(request), 'strict')
-  if (rateLimitResponse) return rateLimitResponse
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('[atelier] Missing required server-side Supabase environment configuration')
+    return NextResponse.json({ error: 'خدمة المعاينة غير مكتملة الإعداد. يرجى التواصل مع الدعم.' }, { status: 503 })
+  }
 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
