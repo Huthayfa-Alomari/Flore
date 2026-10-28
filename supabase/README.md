@@ -4,19 +4,22 @@
 
 Do **not** run `supabase/schema.sql` against a database that already contains customer orders or products. That file is a fresh-install schema and contains destructive `DROP TABLE ... CASCADE` statements.
 
-For an existing Supabase project, run the migrations in order from the SQL Editor:
+Before applying migrations to an existing database, inspect its tables and columns. Some installations were initialized from a schema that already contains the Atelier tables, so re-running migrations 002–004 may duplicate seed rows or fail on existing policies. Apply only the missing changes.
 
-1. `migrations/002_atelier_tables.sql`
-2. `migrations/003_add_accessories_and_plants_categories.sql`
-3. `migrations/004_atelier_missing_tables.sql`
-4. `migrations/005_ar_models_and_flower_images.sql`
-5. `migrations/006_atomic_ai_generation_quota.sql`
+Migration purposes:
 
-Then run `seed_luxury_products.sql`. The seed adds the 24 catalog products that are missing by name. It does not delete existing products or overwrite existing product details. Review the proposed catalog and product image CDN URLs before production use.
+- `migrations/002_atelier_tables.sql`: flower types and container tables; use only if these tables/policies are absent.
+- `migrations/003_add_accessories_and_plants_categories.sql`: category constraint update; use only if the category constraint does not already include `accessories` and `plants`.
+- `migrations/004_atelier_missing_tables.sql`: greenery, bouquet sizes, image-generation logs, and the `atelier-previews` bucket; inspect for existing tables/policies before running.
+- `migrations/005_ar_models_and_flower_images.sql`: product model metadata and flower reference images.
+- `migrations/006_atomic_ai_generation_quota.sql`: atomic daily AI image-generation quota.
+- `migrations/007_vase_container_type.sql`: adds the `container_type` column used by the Atelier image-generation API.
+
+Then run `seed_luxury_products.sql` if the catalog needs seeding. The seed adds the 24 catalog products that are missing by name. It does not delete existing products or overwrite existing product details. Review the proposed catalog and product image CDN URLs before production use.
 
 ## New, empty database
 
-Only for a genuinely empty project, review `schema.sql` and run it first, then run the migrations and product seed above. Never use the fresh-install schema as an upgrade script.
+Only for a genuinely empty project, review `schema.sql` and run it first, then check which migrations are still required and run the product seed above. Never use the fresh-install schema as an upgrade script.
 
 ## AI configuration
 
