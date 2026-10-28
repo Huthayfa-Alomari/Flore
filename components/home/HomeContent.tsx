@@ -214,19 +214,37 @@ export default function HomeContent({
                     </p>
                 </motion.div>
 
-                <div className="grid grid-cols-1 gap-6 md:gap-8 md:grid-cols-2 lg:grid-cols-3">
-                    {featuredProducts.map((product, i) => (
-                        <motion.div
-                            key={product.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true, margin: "-40px" }}
-                            transition={{ duration: 0.45, delay: (i % 3) * 0.08 }}
-                        >
-                            <ProductCard product={product} />
-                        </motion.div>
-                    ))}
-                </div>
+                {featuredProducts.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-6 md:gap-8 md:grid-cols-2 lg:grid-cols-3">
+                        {featuredProducts.map((product, i) => (
+                            <motion.div
+                                key={product.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true, margin: "-40px" }}
+                                transition={{ duration: 0.45, delay: (i % 3) * 0.08 }}
+                            >
+                                <ProductCard product={product} />
+                            </motion.div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="border-y border-flore-border/70 py-12 text-center">
+                        <Flower2 className="mx-auto mb-4 h-8 w-8 text-flore-gold-dark" strokeWidth={1.2} />
+                        <p className="font-amiri text-xl text-flore-text-primary">المجموعة الجديدة قيد التجهيز</p>
+                        <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-flore-text-secondary">
+                            يمكنك استكشاف مجموعتنا أو تصميم هديتك الخاصة من الأتيليه.
+                        </p>
+                        <div className="mt-6 flex flex-wrap justify-center gap-3">
+                            <Link href="/catalog" className="inline-flex min-h-11 items-center border border-flore-border px-5 text-sm transition-colors hover:border-flore-gold-dark">
+                                استكشف المجموعة
+                            </Link>
+                            <Link href="/atelier" className="inline-flex min-h-11 items-center bg-flore-primary px-5 text-sm text-white transition-colors hover:bg-flore-primary-dark">
+                                صمّم هديتك
+                            </Link>
+                        </div>
+                    </div>
+                )}
             </section>
 
             <GoldDivider />
