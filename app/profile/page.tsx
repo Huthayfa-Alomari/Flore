@@ -247,7 +247,7 @@ export default function ProfilePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-flore-bg px-4 py-10 sm:px-6 md:py-14">
+    <div className="flore-profile-page min-h-screen bg-flore-bg px-4 py-10 sm:px-6 md:py-14">
       <div className="mx-auto max-w-4xl">
 
         {/* ترويسة الصفحة */}
