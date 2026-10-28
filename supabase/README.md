@@ -23,9 +23,9 @@ Only for a genuinely empty project, review `schema.sql` and run it first, then c
 
 ## AI configuration
 
-Set `OPENROUTER_API_KEY`, `OPENROUTER_CHAT_MODEL`, and `OPENROUTER_IMAGE_MODEL` in the deployment environment. Configure both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for distributed rate limiting. In production, the chat and image-preview endpoints intentionally return 503 when rate limiting is not configured rather than allowing unbounded billable requests.
+Set `OPENROUTER_API_KEY`, `OPENROUTER_CHAT_MODEL`, and `OPENROUTER_IMAGE_MODEL` in the deployment environment. Configure both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for distributed rate limiting. In production, the AI chat route may require Upstash depending on its implementation. The Atelier image-preview route uses the atomic database quota from migration 006 as a hard fallback cap of five generations per identifier per UTC day when Upstash is not configured. If Upstash is configured but its limiter fails, the preview route fails closed. Configure both Upstash variables for additional distributed per-minute protection.
 
-The Atelier daily quota uses the `claim_ai_generation` RPC from migration 006 to reserve quota atomically. The service-role key must remain server-side and must never use a `NEXT_PUBLIC_` prefix.
+The Atelier daily quota uses the `claim_ai_generation` RPC from migration 006 to reserve quota atomically. The `atelier-previews` Storage bucket from migration 004 must exist for generated images to be saved. The service-role key must remain server-side and must never use a `NEXT_PUBLIC_` prefix.
 
 ## 3D model assets
 
