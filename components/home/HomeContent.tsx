@@ -97,83 +97,92 @@ export default function HomeContent({
     return (
         <div className="space-y-20 md:space-y-28">
 
-            {/* ═══ Hero ═══ */}
-            <section
-                dir="rtl"
-                className="relative flex min-h-[88vh] items-center justify-center overflow-hidden"
-            >
-                {/* خلفية عاجية هادئة مع هالات ناعمة */}
-                <div className="absolute inset-0 bg-flore-bg" />
-
-                <div className="absolute inset-0 opacity-40" aria-hidden="true">
-                    <div className="absolute left-[8%] top-[12%] h-80 w-80 rounded-full bg-flore-subtle blur-3xl" />
-                    <div className="absolute bottom-[8%] right-[6%] h-[28rem] w-[28rem] rounded-full bg-flore-gold/15 blur-3xl" />
-                    <div className="absolute right-[20%] top-[30%] h-56 w-56 rounded-full bg-flore-blush/60 blur-3xl" />
-                </div>
-
-                <div className="relative z-10 mx-auto max-w-3xl px-4 text-center">
+            {/* FLORÉ — editorial gifting hero */}
+            <section dir="rtl" className="flore-editorial-hero relative overflow-hidden">
+                <div className="flore-hero-grain" aria-hidden="true" />
+                <div className="relative z-10 mx-auto grid min-h-[690px] max-w-[1400px] items-center gap-10 px-5 pb-16 pt-28 sm:px-8 lg:min-h-[760px] lg:grid-cols-[0.94fr_1.06fr] lg:gap-16 lg:px-16 lg:py-20">
                     <motion.div
-                        initial={{ opacity: 0, y: 28 }}
+                        initial={{ opacity: 0, y: 22 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.7, ease: [0.22, 0.61, 0.36, 1] }}
+                        className="order-2 max-w-xl lg:order-1"
                     >
-                        {/* Eyebrow — توقيع كورمورانت */}
-                        <p className="flore-eyebrow mb-7">
-                            <span className="font-display italic normal-case tracking-[0.12em] text-flore-gold-dark text-sm">
-                                Give Beautifully
-                            </span>
+                        <p className="flore-editorial-kicker mb-7">
+                            <span className="flore-kicker-line" />
+                            <span>THE ART OF GIVING</span>
+                            <span className="text-flore-gold-dark">·</span>
+                            <span>عمّان، الأردن</span>
                         </p>
-
-                        <h1 className="mb-6 font-amiri text-6xl font-bold leading-[1.1] text-flore-text-primary md:text-8xl">
-                            فلوري
+                        <h1 className="mb-7 font-amiri text-[3.25rem] font-bold leading-[1.16] tracking-tight text-flore-text-primary sm:text-6xl lg:text-[5.2rem]">
+                            بعض المشاعر،
+                            <span className="mt-1 block font-display font-normal italic text-flore-primary">لا تُقال.</span>
+                            <span className="block">بل تُهدى.</span>
                         </h1>
-
-                        <div className="mx-auto mb-8 flex items-center justify-center gap-3" aria-hidden="true">
-                            <span className="h-px w-14 bg-flore-gold-dark/50" />
-                            <Flower2 className="h-4 w-4 text-flore-gold-dark" />
-                            <span className="h-px w-14 bg-flore-gold-dark/50" />
-                        </div>
-
-                        <p className="mx-auto mb-12 max-w-xl font-noto text-lg leading-loose text-flore-text-secondary md:text-xl">
-                            ما بتشتري باقة، بتصمّم هدية تحمل معنى.
-                            <br className="hidden sm:block" />
-                            توصيل سريع في عمّان والزرقاء.
+                        <p className="mb-9 max-w-md text-base leading-8 text-flore-text-secondary sm:text-lg">
+                            هدايا زهرية تُصمَّم حول شخص واحد، ولحظة واحدة، ومعنى يبقى أطول من الورد.
                         </p>
-
-                        <div className="flex flex-col justify-center gap-3 sm:flex-row">
-                            <Link href="/atelier" className="sm:w-auto w-full">
-                                <Button
-                                    size="lg"
-                                    className="w-full gap-2"
-                                >
-                                    صمّم هديتك
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                            <Link href="/atelier" className="w-full sm:w-auto">
+                                <Button size="lg" className="flore-editorial-cta w-full gap-3">
+                                    اصنع هديتك
                                     <Sparkles className="h-4 w-4" />
                                 </Button>
                             </Link>
-
-                            <Link href="/catalog" className="sm:w-auto w-full">
-                                <Button
-                                    variant="outline"
-                                    size="lg"
-                                    className="w-full gap-2"
-                                >
-                                    استكشف فلوري
+                            <Link href="/catalog" className="w-full sm:w-auto">
+                                <Button variant="outline" size="lg" className="flore-editorial-secondary w-full gap-3">
+                                    اكتشف المجموعة
                                     <ArrowLeft className="h-4 w-4" />
                                 </Button>
                             </Link>
                         </div>
+                        <div className="mt-12 flex items-center gap-4 border-t border-flore-border/80 pt-5">
+                            <div className="flex -space-x-2 space-x-reverse" aria-hidden="true">
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-flore-bg bg-[#e9d8d0] font-amiri text-sm text-[#604a43]">ف</span>
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-flore-bg bg-[#d7dfd1] font-amiri text-sm text-[#435448]">ز</span>
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-flore-bg bg-[#eadfc4] font-amiri text-sm text-[#675735]">و</span>
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-flore-text-primary">تفاصيل تصنع الفرق</p>
+                                <p className="mt-0.5 text-xs text-flore-text-secondary">تغليف مدروس · رسالة شخصية · توصيل محلي</p>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.975 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.9, ease: [0.22, 0.61, 0.36, 1] }}
+                        className="flore-hero-art order-1 lg:order-2"
+                    >
+                        <div className="flore-hero-image-wrap">
+                            <Image
+                                src="https://i.pinimg.com/control1/1200x/49/79/2a/49792a35f698e62abd2546f0ba68736d.jpg"
+                                alt="تنسيق زهور فاخر من FLORÉ"
+                                fill
+                                priority
+                                sizes="(max-width: 1024px) 100vw, 52vw"
+                                className="object-cover"
+                            />
+                            <div className="flore-hero-image-shade" />
+                            <div className="flore-image-caption">
+                                <span className="font-display text-xs uppercase tracking-[0.24em]">FLORÉ ATELIER</span>
+                                <span className="h-px w-8 bg-white/60" />
+                                <span className="text-sm">مصمّمة لتُشبههم</span>
+                            </div>
+                        </div>
+                        <div className="flore-hero-seal" aria-hidden="true">
+                            <span className="font-display text-[10px] uppercase tracking-[0.2em]">Made with</span>
+                            <Flower2 className="my-1 h-5 w-5" strokeWidth={1.2} />
+                            <span className="font-display text-[10px] uppercase tracking-[0.2em]">meaning</span>
+                        </div>
+                        <span className="flore-hero-index" aria-hidden="true">01 / 04</span>
                     </motion.div>
                 </div>
-
-                {/* مؤشر تمرير رقيق */}
-                <motion.div
-                    animate={{ y: [0, 8, 0] }}
-                    transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:block"
-                    aria-hidden="true"
-                >
-                    <div className="h-10 w-px bg-gradient-to-b from-transparent via-flore-gold-dark to-transparent" />
-                </motion.div>
+                <div className="flore-hero-bottomline" aria-hidden="true">
+                    <span>FLOWERS WITH FEELING</span>
+                    <span className="hidden sm:inline">DESIGNED IN JORDAN</span>
+                    <span>FLORÉ · EST. FOR YOUR MOMENTS</span>
+                </div>
             </section>
 
             {/* ═══ المناسبات ═══ */}
