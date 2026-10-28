@@ -4,6 +4,7 @@ ALTER TABLE public.vase_options ADD COLUMN IF NOT EXISTS container_type TEXT;
 
 UPDATE public.vase_options
 SET container_type = CASE
+  WHEN lower(name) LIKE '%no vase%' OR coalesce(name_ar, '') LIKE '%بدون%' THEN 'wrap'
   WHEN lower(name) LIKE '%glass%'
     OR lower(name) LIKE '%ceramic%'
     OR coalesce(name_ar, '') LIKE '%مزهرية%' THEN 'glass_vase'
