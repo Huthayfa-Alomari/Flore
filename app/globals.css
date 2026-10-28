@@ -305,3 +305,28 @@ a, button { -webkit-tap-highlight-color: transparent; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* Site-wide component polish */
+.flore-site-nav {
+  border-bottom-color: color-mix(in srgb, var(--flore-border) 72%, transparent) !important;
+  box-shadow: 0 8px 28px -24px rgba(43,43,39,.34);
+}
+.flore-site-nav > div { max-width: 1440px; }
+.flore-site-nav a { text-underline-offset: 5px; }
+.flore-site-nav a[aria-current="page"] { color: var(--flore-primary); }
+.flore-product-card {
+  border-radius: 3px !important;
+  box-shadow: 0 10px 35px -28px rgba(43,43,39,.38) !important;
+  background: var(--flore-card);
+}
+.flore-product-card > a:first-child { border-radius: 0 !important; }
+.flore-product-card > div:last-child { padding: clamp(16px, 2vw, 24px); }
+.flore-product-card h3 { letter-spacing: -.015em; }
+.flore-product-card button { border-radius: 2px; }
+section h2 { letter-spacing: -.025em; }
+input, textarea, select {
+  border-radius: 2px;
+  accent-color: var(--flore-primary);
+}
+button:not(:disabled), a { touch-action: manipulation; }
