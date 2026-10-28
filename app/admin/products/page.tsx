@@ -267,7 +267,7 @@ export default function AdminProductsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flore-admin-products-page space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <p className="flore-eyebrow flore-eyebrow-right mb-3">Products</p>

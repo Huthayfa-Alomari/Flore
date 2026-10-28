@@ -214,3 +214,304 @@ model-viewer {
     unicode-bidi: embed;
     display: inline-block;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   FLORÉ EDITORIAL — Maison-inspired luxury storefront refresh
+   Keep brand tokens; add art direction, whitespace and tactile detail.
+   ═══════════════════════════════════════════════════════════════ */
+html { scroll-behavior: smooth; }
+body {
+  background: var(--flore-bg);
+  color: var(--flore-text-primary);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: rgba(203, 180, 127, .32); color: var(--flore-text-primary); }
+a, button { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--flore-gold-dark); outline-offset: 4px; }
+.flore-editorial-hero {
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 8% 16%, rgba(203,180,127,.12), transparent 38%),
+    radial-gradient(ellipse at 90% 75%, rgba(169,184,165,.16), transparent 38%),
+    var(--flore-bg);
+}
+.flore-hero-grain {
+  position: absolute; inset: 0; pointer-events: none; opacity: .18;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+}
+.flore-editorial-kicker {
+  display: flex; align-items: center; gap: 11px;
+  color: var(--flore-text-secondary); font-size: 10px; font-weight: 600;
+  letter-spacing: .19em; text-transform: uppercase;
+}
+.flore-kicker-line { display: inline-block; width: 26px; height: 1px; background: var(--flore-gold-dark); }
+.flore-hero-art { position: relative; width: 100%; max-width: 650px; margin-inline: auto; padding: 0 12px 16px 0; }
+.flore-hero-image-wrap {
+  position: relative; isolation: isolate; overflow: hidden; aspect-ratio: 4 / 4.7;
+  background: var(--flore-bg-alt); border-radius: 48% 48% 5px 5px;
+  box-shadow: 0 30px 70px -35px rgba(43,43,39,.35);
+}
+.flore-hero-image-wrap img { transition: transform 1.2s cubic-bezier(.2,.65,.3,1); }
+.flore-hero-image-wrap:hover img { transform: scale(1.035); }
+.flore-hero-image-shade {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(0deg, rgba(20,25,21,.54), transparent 38%);
+}
+.flore-image-caption {
+  position: absolute; z-index: 2; inset-inline: 26px; bottom: 25px;
+  display: flex; align-items: center; gap: 12px; color: white;
+}
+.flore-hero-seal {
+  position: absolute; z-index: 3; left: -2px; top: 13%;
+  display: flex; width: 104px; height: 104px; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px solid rgba(171,145,93,.55); border-radius: 999px;
+  background: var(--flore-bg); color: var(--flore-primary); text-align: center;
+  box-shadow: 0 12px 32px rgba(43,43,39,.08); transform: rotate(-9deg);
+}
+.flore-hero-index { position: absolute; right: 0; bottom: 0; color: var(--flore-text-secondary); font-family: var(--font-display), serif; font-size: 11px; letter-spacing: .2em; }
+.flore-hero-bottomline {
+  position: absolute; bottom: 0; inset-inline: 0; display: flex; justify-content: space-between; gap: 12px;
+  border-top: 1px solid var(--flore-border); padding: 14px clamp(20px, 5vw, 72px);
+  color: var(--flore-text-secondary); font-family: var(--font-display), serif; font-size: 9px; letter-spacing: .18em;
+}
+.flore-editorial-cta {
+  min-height: 54px; padding-inline: 28px; border: 1px solid var(--flore-primary) !important;
+  border-radius: 2px !important; background: var(--flore-primary) !important;
+  box-shadow: none !important; transition: background .25s ease, transform .25s ease !important;
+}
+.flore-editorial-cta:hover { background: var(--flore-primary-dark) !important; transform: translateY(-2px); }
+.flore-editorial-secondary {
+  min-height: 54px; padding-inline: 25px; border-radius: 2px !important;
+  border-color: var(--flore-border) !important; background: transparent !important;
+}
+.flore-editorial-secondary:hover { border-color: var(--flore-gold-dark) !important; background: rgba(203,180,127,.08) !important; }
+.flore-lift { transition: transform .35s ease, box-shadow .35s ease; }
+.flore-lift:hover { transform: translateY(-3px); }
+@media (min-width: 1024px) {
+  .flore-hero-art { padding: 0 20px 20px 0; }
+  .flore-hero-image-wrap { aspect-ratio: 4 / 4.85; }
+}
+@media (max-width: 639px) {
+  .flore-hero-art { padding: 0 12px 14px 0; }
+  .flore-hero-image-wrap { aspect-ratio: 5 / 4.4; border-radius: 48% 48% 3px 3px; }
+  .flore-hero-seal { width: 78px; height: 78px; left: 0; top: 9%; }
+  .flore-hero-seal svg { width: 16px; height: 16px; margin-block: 2px; }
+  .flore-hero-seal span { font-size: 8px; }
+  .flore-hero-bottomline { font-size: 8px; letter-spacing: .1em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+
+/* Site-wide component polish */
+.flore-site-nav {
+  border-bottom-color: color-mix(in srgb, var(--flore-border) 72%, transparent) !important;
+  box-shadow: 0 8px 28px -24px rgba(43,43,39,.34);
+}
+.flore-site-nav > div { max-width: 1440px; }
+.flore-site-nav a { text-underline-offset: 5px; }
+.flore-site-nav a[aria-current="page"] { color: var(--flore-primary); }
+.flore-product-card {
+  border-radius: 3px !important;
+  box-shadow: 0 10px 35px -28px rgba(43,43,39,.38) !important;
+  background: var(--flore-card);
+}
+.flore-product-card > a:first-child { border-radius: 0 !important; }
+.flore-product-card > div:last-child { padding: clamp(16px, 2vw, 24px); }
+.flore-product-card h3 { letter-spacing: -.015em; }
+.flore-product-card button { border-radius: 2px; }
+section h2 { letter-spacing: -.025em; }
+input, textarea, select {
+  border-radius: 2px;
+  accent-color: var(--flore-primary);
+}
+button:not(:disabled), a { touch-action: manipulation; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   FLORÉ MASTER DESIGN SYSTEM — editorial luxury, product-wide
+   Guidance: ui-ux-pro-max (accessibility, responsive rhythm,
+   touch targets, visible focus, restrained motion, clear forms).
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --flore-radius-card: 4px;
+  --flore-radius-control: 3px;
+  --flore-content-width: 1360px;
+}
+html { scroll-padding-top: 92px; }
+body { overflow-x: clip; }
+img { color: transparent; }
+a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), [role="button"], input[type="checkbox"], input[type="radio"] { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--flore-gold-dark); outline-offset: 3px; }
+::selection { background: color-mix(in srgb, var(--flore-gold) 42%, transparent); color: var(--flore-text-primary); }
+
+/* Navigation: calm, compact, and legible */
+.flore-site-nav {
+  border-bottom-color: color-mix(in srgb, var(--flore-border) 78%, transparent) !important;
+  box-shadow: 0 8px 28px -24px rgba(43,43,39,.42);
+  transition: background-color .25s ease, border-color .25s ease;
+}
+.flore-site-nav > div { max-width: 1440px; }
+.flore-site-nav a { text-underline-offset: 5px; }
+.flore-site-nav a[aria-current="page"] { color: var(--flore-primary); }
+
+/* Collection / discovery */
+.flore-catalog-page { max-width: 1440px; }
+.flore-catalog-page > div:first-child { position: relative; }
+.flore-catalog-page input[type="search"],
+.flore-catalog-page input:not([type]) {
+  min-height: 48px; border-radius: var(--flore-radius-control);
+  background: var(--flore-card); border-color: var(--flore-border);
+}
+.flore-catalog-page button { min-height: 42px; }
+.flore-catalog-page .grid { align-items: stretch; }
+.flore-catalog-page .grid > * { min-width: 0; }
+
+/* Product cards: gallery-first, quiet details, predictable actions */
+.flore-product-card {
+  border-radius: var(--flore-radius-card) !important;
+  box-shadow: 0 10px 35px -28px rgba(43,43,39,.42) !important;
+  background: var(--flore-card);
+  transition: transform .3s cubic-bezier(.22,.61,.36,1), box-shadow .3s ease, border-color .3s ease;
+}
+.flore-product-card:hover {
+  box-shadow: 0 22px 42px -30px rgba(43,43,39,.42) !important;
+  border-color: color-mix(in srgb, var(--flore-gold-dark) 45%, var(--flore-border)) !important;
+}
+.flore-product-card > a:first-child { border-radius: 0 !important; }
+.flore-product-card button { border-radius: var(--flore-radius-control); min-height: 44px; }
+
+/* Atelier — treat the bouquet builder like a design studio */
+.flore-atelier-page { max-width: 1440px; padding-bottom: 3rem; }
+.flore-atelier-page h1 { line-height: 1.2; }
+.flore-atelier-page button { transition: background-color .2s ease, border-color .2s ease, transform .2s ease; }
+.flore-atelier-page button:active { transform: scale(.985); }
+.flore-atelier-page img { object-fit: cover; }
+.flore-atelier-page [class*="rounded-3xl"],
+.flore-atelier-page [class*="rounded-2xl"] { border-radius: 5px !important; }
+.flore-atelier-page input, .flore-atelier-page textarea, .flore-atelier-page select {
+  min-height: 44px; border-radius: var(--flore-radius-control);
+}
+
+/* Cart and checkout: clear purchase hierarchy */
+.flore-cart-page, .flore-checkout-page, .flore-profile-page { padding-top: 1.5rem; }
+.flore-cart-page > div, .flore-checkout-page > div, .flore-profile-page > div { max-width: 1200px; }
+.flore-cart-page [class*="rounded-3xl"],
+.flore-cart-page [class*="rounded-2xl"],
+.flore-checkout-page [class*="rounded-3xl"],
+.flore-checkout-page [class*="rounded-2xl"],
+.flore-profile-page [class*="rounded-3xl"],
+.flore-profile-page [class*="rounded-2xl"] { border-radius: 5px !important; }
+.flore-cart-page button, .flore-checkout-page button, .flore-profile-page button { min-height: 44px; }
+.flore-checkout-page input, .flore-checkout-page textarea, .flore-checkout-page select,
+.flore-profile-page input, .flore-profile-page textarea, .flore-profile-page select {
+  min-height: 46px; border-radius: var(--flore-radius-control);
+  border-color: var(--flore-border); background-color: var(--flore-card);
+}
+.flore-checkout-page label, .flore-profile-page label { display: inline-block; margin-bottom: .35rem; }
+.flore-cart-page img { background: var(--flore-bg-alt); }
+
+/* Authentication: editorial sign-in panel */
+.flore-login-page {
+  position: relative; isolation: isolate; overflow: hidden;
+  background:
+    radial-gradient(ellipse at 8% 15%, color-mix(in srgb, var(--flore-gold) 15%, transparent), transparent 42%),
+    radial-gradient(ellipse at 92% 88%, color-mix(in srgb, var(--flore-sage) 18%, transparent), transparent 40%);
+}
+.flore-login-page > div { width: 100%; }
+.flore-login-page [class*="rounded-3xl"],
+.flore-login-page [class*="rounded-2xl"] { border-radius: 5px !important; }
+.flore-login-page input { min-height: 48px; border-radius: var(--flore-radius-control); }
+
+/* Office interface: operational clarity, not storefront decoration */
+.flore-admin-page, .flore-admin-products-page, .flore-admin-orders-page {
+  color: var(--flore-text-primary);
+}
+.flore-admin-page [class*="rounded-3xl"],
+.flore-admin-page [class*="rounded-2xl"],
+.flore-admin-products-page [class*="rounded-3xl"],
+.flore-admin-products-page [class*="rounded-2xl"],
+.flore-admin-orders-page [class*="rounded-3xl"],
+.flore-admin-orders-page [class*="rounded-2xl"] { border-radius: 5px !important; }
+.flore-admin-page table, .flore-admin-orders-page table { border-collapse: separate; border-spacing: 0; width: 100%; }
+.flore-admin-page thead, .flore-admin-orders-page thead {
+  background: var(--flore-bg-alt); color: var(--flore-text-secondary);
+  font-size: 11px; letter-spacing: .04em;
+}
+.flore-admin-page th, .flore-admin-orders-page th { font-weight: 600; white-space: nowrap; }
+.flore-admin-page th, .flore-admin-page td,
+.flore-admin-orders-page th, .flore-admin-orders-page td {
+  padding: 14px 16px; border-bottom: 1px solid var(--flore-border);
+}
+.flore-admin-page tbody tr:hover, .flore-admin-orders-page tbody tr:hover {
+  background: color-mix(in srgb, var(--flore-subtle) 55%, transparent);
+}
+.flore-admin-page button, .flore-admin-products-page button, .flore-admin-orders-page button { min-height: 40px; }
+.flore-admin-products-page input, .flore-admin-products-page textarea, .flore-admin-products-page select {
+  min-height: 44px; border-radius: var(--flore-radius-control);
+}
+
+/* Shared controls: no tiny hit areas or placeholder-only affordances */
+input, textarea, select {
+  accent-color: var(--flore-primary);
+  max-width: 100%;
+}
+input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; }
+button, [role="button"] { touch-action: manipulation; }
+table { font-variant-numeric: tabular-nums; }
+:where(.flore-cart-page, .flore-checkout-page, .flore-profile-page, .flore-login-page) p {
+  line-height: 1.7;
+}
+
+/* Mobile-first fit, safe-area room for bottom navigation */
+@media (max-width: 767px) {
+  .flore-catalog-page { padding-top: 1.75rem; }
+  .flore-catalog-page .grid { column-gap: 12px; row-gap: 16px; }
+  .flore-product-card > div:last-child { padding: 12px !important; }
+  .flore-atelier-page { padding-inline: 12px; }
+  .flore-cart-page, .flore-checkout-page, .flore-profile-page { padding-top: .75rem; }
+  .flore-admin-page, .flore-admin-products-page, .flore-admin-orders-page { padding-inline: 12px; }
+  .flore-admin-page th, .flore-admin-page td,
+  .flore-admin-orders-page th, .flore-admin-orders-page td { padding: 10px 12px; }
+  .flore-admin-page .overflow-x-auto, .flore-admin-orders-page .overflow-x-auto {
+    border: 1px solid var(--flore-border); border-radius: 5px; background: var(--flore-card);
+  }
+  .flore-login-page { min-height: 76vh; padding-block: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+
+/* Final component consistency */
+.flore-catalog-page button,
+.flore-atelier-page button,
+.flore-cart-page button,
+.flore-checkout-page button,
+.flore-profile-page button,
+.flore-login-page button,
+.flore-admin-page button,
+.flore-admin-products-page button,
+.flore-admin-orders-page button { border-radius: var(--flore-radius-control); }
+.flore-site-footer {
+  background:
+    radial-gradient(ellipse at 95% 0%, color-mix(in srgb, var(--flore-sage) 13%, transparent), transparent 42%),
+    var(--flore-bg-alt);
+}
+.flore-site-footer a { text-underline-offset: 4px; }
+.flore-site-footer a:focus-visible { outline-offset: 4px; }
+.flore-site-footer > div { max-width: 1440px; }
+@media (hover: hover) and (pointer: fine) {
+  .flore-catalog-page button:hover,
+  .flore-atelier-page button:hover,
+  .flore-cart-page button:hover,
+  .flore-checkout-page button:hover,
+  .flore-profile-page button:hover { transform: translateY(-1px); }
+}

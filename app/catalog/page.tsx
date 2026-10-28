@@ -87,7 +87,7 @@ function CatalogContent() {
   }, 300)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
+    <div className="flore-catalog-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
       {/* Header */}
       <div className="text-center mb-10 md:mb-14">
         <p className="flore-eyebrow mb-4">THE COLLECTION</p>

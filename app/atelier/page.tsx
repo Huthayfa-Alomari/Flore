@@ -1303,7 +1303,7 @@ export default function AtelierPage() {
       className="min-h-screen bg-flore-bg pb-32 font-noto"
       dir="rtl"
     >
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="flore-atelier-page max-w-6xl mx-auto px-4 py-6">
 
         {/* ─────────────────────────────────────────────── */}
         {/* Header */}

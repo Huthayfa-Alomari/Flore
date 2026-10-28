@@ -1,15 +1,14 @@
 -- ============================================================
 -- 🌸 Floré Luxury — كتالوج المنتجات الفاخر (24 منتجًا)
--- يشغَّل بعد schema.sql من SQL Editor في Supabase
--- آمن لإعادة التشغيل: يمسح المنتجات السابقة ويعيد الإدخال
+-- شغّله بعد تطبيق schema.sql والمigrations في Supabase SQL Editor.
+-- آمن لإعادة التشغيل: يضيف المنتجات الناقصة فقط ولا يمسح أو يغيّر منتجات المتجر الحالية.
 -- الصور مستضافة على CDN عام ومربوطة في next.config.js
 -- ============================================================
 
 -- مسح أي منتجات سابقة (الطلبات تحفظ نسخة من البيانات فلا تتأثر)
-DELETE FROM products;
-
-INSERT INTO products
-  (name, name_en, category, price, currency, image, images, description, description_en, badge, badge_color, in_stock, ar_enabled, created_at) VALUES
+-- لا نحذف المنتجات الموجودة؛ هذا الملف يضيف المنتجات الناقصة فقط.
+INSERT INTO products (name, name_en, category, price, currency, image, images, description, description_en, badge, badge_color, in_stock, ar_enabled, created_at)
+SELECT seed.* FROM (VALUES
 -- === الواجهة الرئيسية (أحدث 8 تظهر في الصفحة الأولى) ===
 ('باقة فلوريه التوقيع', 'Floré Signature Bouquet', 'bouquets', 110.00, 'JOD',
  'https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/d0b00e2422bf.jpg',
@@ -177,4 +176,8 @@ INSERT INTO products
  ARRAY['https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/d4bfd0d42921.jpg'],
  'تشكيلة عصاريات ملونة في وعاء أبيض أنيق؛ زينة مكتب لا تذبل مع النسيان. هدية عملية أنيقة للزملاء والمعلمين، وتروى مرة كل أسبوعين بملعقة ماء واحدة.',
  'Colourful succulents in a sleek white bowl — desk greenery that forgives neglect, watered just weekly.',
- NULL, NULL, true, false, now() - interval '23 hours');
+ NULL, NULL, true, false, now() - interval '23 hours'
+) AS seed(name, name_en, category, price, currency, image, images, description, description_en, badge, badge_color, in_stock, ar_enabled, created_at)
+WHERE NOT EXISTS (
+  SELECT 1 FROM products existing WHERE lower(existing.name) = lower(seed.name)
+);

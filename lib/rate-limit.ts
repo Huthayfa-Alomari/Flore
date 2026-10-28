@@ -92,3 +92,8 @@ export function getClientIp(request: Request): string {
     if (forwardedFor) return forwardedFor.split(',')[0].trim()
     return request.headers.get('x-real-ip') || 'unknown'
 }
+
+/** True only when the distributed limiter is available; AI routes use this to fail closed in production. */
+export function isRateLimitConfigured(): boolean {
+    return redis !== null
+}

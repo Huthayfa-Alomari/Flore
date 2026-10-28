@@ -214,7 +214,7 @@ export default function CheckoutPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-flore-bg pb-24 font-noto text-right" dir="rtl">
+    <div className="flore-checkout-page min-h-screen bg-flore-bg pb-24 font-noto text-right" dir="rtl">
       <div className="max-w-2xl mx-auto px-4 py-10 md:py-14">
 
         <button

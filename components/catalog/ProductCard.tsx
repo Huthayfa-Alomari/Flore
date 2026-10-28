@@ -25,7 +25,7 @@ export function ProductCard({ product }: ProductCardProps) {
       transition={{ duration: 0.45, ease: [0.22, 0.61, 0.36, 1] }}
       className="group"
     >
-      <div className="flore-lift relative bg-flore-card rounded-3xl overflow-hidden border border-flore-border/70 shadow-luxury-soft">
+      <div className="flore-product-card flore-lift relative bg-flore-card rounded-3xl overflow-hidden border border-flore-border/70 shadow-luxury-soft">
         {/* الصورة */}
         <Link
           href={`/product/${product.id}`}

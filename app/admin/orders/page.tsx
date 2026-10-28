@@ -79,7 +79,7 @@ export default function AdminOrdersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flore-admin-orders-page space-y-6">
       <div>
         <p className="flore-eyebrow flore-eyebrow-right mb-3">Orders</p>
         <h1 className="font-amiri text-3xl md:text-4xl font-bold text-flore-text-primary">إدارة الطلبات</h1>

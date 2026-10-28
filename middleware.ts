@@ -1,39 +1,49 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// مسارات الـ Webhooks تُستدعى من خوادم خارجية (Stripe، CliQ) وليس من متصفح المستخدم،
-// فلا يوجد لديها Origin header مطابق أصلاً — وهي محمية بالفعل عبر التحقق من التوقيع/السر الخاص بها
+// External payment callbacks authenticate requests with their own signatures/secrets.
 const WEBHOOK_PATHS = ['/api/payment/stripe/webhook', '/api/payment/cliq/callback']
 const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
 
 function isCsrfSafe(request: NextRequest): boolean {
   if (!UNSAFE_METHODS.includes(request.method)) return true
   if (!request.nextUrl.pathname.startsWith('/api/')) return true
-  if (WEBHOOK_PATHS.some((p) => request.nextUrl.pathname.startsWith(p))) return true
+  if (WEBHOOK_PATHS.some((path) => request.nextUrl.pathname.startsWith(path))) return true
 
   const origin = request.headers.get('origin')
   const host = request.headers.get('host')
-
   if (!origin || !host) return false
 
   try {
-    const originHost = new URL(origin).host
-    return originHost === host
+    return new URL(origin).host === host
   } catch {
     return false
   }
 }
 
 export async function middleware(request: NextRequest) {
-  // حماية CSRF: رفض أي طلب POST/PUT/PATCH/DELETE على /api/* من أصل (Origin) مختلف عن التطبيق نفسه
+  // Keep CSRF protection on unsafe API requests, including public API routes.
   if (!isCsrfSafe(request)) {
     return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
   }
 
+  const pathname = request.nextUrl.pathname
+  const isAdminRoute = pathname.startsWith('/admin')
+  const isLoginRoute = pathname === '/login'
+
+  // Public pages and APIs do not need a Supabase network round-trip here.
+  // Auth checks are performed only on routes whose behavior depends on the session.
+  if (!isAdminRoute && !isLoginRoute) {
+    return NextResponse.next()
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
   if (!supabaseUrl || !supabaseAnonKey) {
+    // Do not allow protected admin pages to proceed when auth is misconfigured.
+    if (isAdminRoute) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
     return NextResponse.next()
   }
 
@@ -47,38 +57,40 @@ export async function middleware(request: NextRequest) {
         return request.cookies.getAll()
       },
       setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value)
-        )
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
         response = NextResponse.next({
           request: { headers: request.headers },
         })
-        cookiesToSet.forEach(({ name, value, options }) =>
+        cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options)
-        )
+        })
       },
     },
   })
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  // حماية مسارات الأدمن
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    if (!user) {
+  // Fail closed for protected admin pages if Supabase auth cannot be verified.
+  if (isAdminRoute) {
+    if (error || !user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-    const { data: role } = await supabase
+
+    const { data: role, error: roleError } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .single()
-    if (!role || (role as { role: string }).role !== 'admin') {
+      .maybeSingle()
+
+    if (roleError || !role || role.role !== 'admin') {
       return NextResponse.redirect(new URL('/', request.url))
     }
   }
 
-  // إعادة توجيه المستخدمين المسجلين من صفحة الدخول
-  if (request.nextUrl.pathname === '/login' && user) {
+  if (isLoginRoute && user && !error) {
     return NextResponse.redirect(new URL('/profile', request.url))
   }
 
