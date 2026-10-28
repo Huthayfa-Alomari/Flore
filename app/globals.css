@@ -214,3 +214,94 @@ model-viewer {
     unicode-bidi: embed;
     display: inline-block;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   FLORÉ EDITORIAL — Maison-inspired luxury storefront refresh
+   Keep brand tokens; add art direction, whitespace and tactile detail.
+   ═══════════════════════════════════════════════════════════════ */
+html { scroll-behavior: smooth; }
+body {
+  background: var(--flore-bg);
+  color: var(--flore-text-primary);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: rgba(203, 180, 127, .32); color: var(--flore-text-primary); }
+a, button { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--flore-gold-dark); outline-offset: 4px; }
+.flore-editorial-hero {
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 8% 16%, rgba(203,180,127,.12), transparent 38%),
+    radial-gradient(ellipse at 90% 75%, rgba(169,184,165,.16), transparent 38%),
+    var(--flore-bg);
+}
+.flore-hero-grain {
+  position: absolute; inset: 0; pointer-events: none; opacity: .18;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+}
+.flore-editorial-kicker {
+  display: flex; align-items: center; gap: 11px;
+  color: var(--flore-text-secondary); font-size: 10px; font-weight: 600;
+  letter-spacing: .19em; text-transform: uppercase;
+}
+.flore-kicker-line { display: inline-block; width: 26px; height: 1px; background: var(--flore-gold-dark); }
+.flore-hero-art { position: relative; width: 100%; max-width: 650px; margin-inline: auto; padding: 0 12px 16px 0; }
+.flore-hero-image-wrap {
+  position: relative; isolation: isolate; overflow: hidden; aspect-ratio: 4 / 4.7;
+  background: var(--flore-bg-alt); border-radius: 48% 48% 5px 5px;
+  box-shadow: 0 30px 70px -35px rgba(43,43,39,.35);
+}
+.flore-hero-image-wrap img { transition: transform 1.2s cubic-bezier(.2,.65,.3,1); }
+.flore-hero-image-wrap:hover img { transform: scale(1.035); }
+.flore-hero-image-shade {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(0deg, rgba(20,25,21,.54), transparent 38%);
+}
+.flore-image-caption {
+  position: absolute; z-index: 2; inset-inline: 26px; bottom: 25px;
+  display: flex; align-items: center; gap: 12px; color: white;
+}
+.flore-hero-seal {
+  position: absolute; z-index: 3; left: -2px; top: 13%;
+  display: flex; width: 104px; height: 104px; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px solid rgba(171,145,93,.55); border-radius: 999px;
+  background: var(--flore-bg); color: var(--flore-primary); text-align: center;
+  box-shadow: 0 12px 32px rgba(43,43,39,.08); transform: rotate(-9deg);
+}
+.flore-hero-index { position: absolute; right: 0; bottom: 0; color: var(--flore-text-secondary); font-family: var(--font-display), serif; font-size: 11px; letter-spacing: .2em; }
+.flore-hero-bottomline {
+  position: absolute; bottom: 0; inset-inline: 0; display: flex; justify-content: space-between; gap: 12px;
+  border-top: 1px solid var(--flore-border); padding: 14px clamp(20px, 5vw, 72px);
+  color: var(--flore-text-secondary); font-family: var(--font-display), serif; font-size: 9px; letter-spacing: .18em;
+}
+.flore-editorial-cta {
+  min-height: 54px; padding-inline: 28px; border: 1px solid var(--flore-primary) !important;
+  border-radius: 2px !important; background: var(--flore-primary) !important;
+  box-shadow: none !important; transition: background .25s ease, transform .25s ease !important;
+}
+.flore-editorial-cta:hover { background: var(--flore-primary-dark) !important; transform: translateY(-2px); }
+.flore-editorial-secondary {
+  min-height: 54px; padding-inline: 25px; border-radius: 2px !important;
+  border-color: var(--flore-border) !important; background: transparent !important;
+}
+.flore-editorial-secondary:hover { border-color: var(--flore-gold-dark) !important; background: rgba(203,180,127,.08) !important; }
+.flore-lift { transition: transform .35s ease, box-shadow .35s ease; }
+.flore-lift:hover { transform: translateY(-3px); }
+@media (min-width: 1024px) {
+  .flore-hero-art { padding: 0 20px 20px 0; }
+  .flore-hero-image-wrap { aspect-ratio: 4 / 4.85; }
+}
+@media (max-width: 639px) {
+  .flore-hero-art { padding: 0 12px 14px 0; }
+  .flore-hero-image-wrap { aspect-ratio: 5 / 4.4; border-radius: 48% 48% 3px 3px; }
+  .flore-hero-seal { width: 78px; height: 78px; left: 0; top: 9%; }
+  .flore-hero-seal svg { width: 16px; height: 16px; margin-block: 2px; }
+  .flore-hero-seal span { font-size: 8px; }
+  .flore-hero-bottomline { font-size: 8px; letter-spacing: .1em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
