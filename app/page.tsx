@@ -11,14 +11,26 @@ export const metadata: Metadata = {
 }
 
 async function getFeaturedProducts(): Promise<Product[]> {
-  const supabase = createClient()
-  const { data } = await supabase
-    .from('products')
-    .select('*')
-    .eq('in_stock', true)
-    .order('created_at', { ascending: false })
-    .limit(8)
-  return (data as Product[]) || []
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('in_stock', true)
+      .order('created_at', { ascending: false })
+      .limit(8)
+      .abortSignal(AbortSignal.timeout(4500))
+
+    if (error) {
+      console.error('[home] featured products query failed:', error.message)
+      return []
+    }
+
+    return (data as Product[]) || []
+  } catch (error) {
+    console.error('[home] featured products request failed:', error)
+    return []
+  }
 }
 
 export default async function HomePage() {
